@@ -57,54 +57,55 @@ deploy() {
   # ------------------------
   # CloudFront + SSL
   # ------------------------
-  echo "🌐 Setting up CloudFront with HTTPS..."
-  CERT_ARN=$(aws acm list-certificates --region us-east-1 \
-      --query "CertificateSummaryList[?DomainName=='$S3_BUCKET'].CertificateArn" --output text)
-
-  if [[ -z "$CERT_ARN" ]]; then
-    echo "🔐 Requesting new ACM certificate..."
-    CERT_ARN=$(aws acm request-certificate \
-        --domain-name $S3_BUCKET \
-        --validation-method DNS \
-        --tags Key=Project,Value=$PROJECT_NAME Key=Owner,Value=$OWNER Key=Environment,Value=$ENVIRONMENT \
-        --region us-east-1 \
-        --query 'CertificateArn' --output text)
-    echo "⚠️ DNS validation required for $S3_BUCKET. Validate in ACM console before CloudFront will serve HTTPS."
-  fi
-
-  CF_DIST_ID=$(aws cloudfront create-distribution \
-      --distribution-config "{
-        \"CallerReference\": \"${PROJECT_NAME}-${ENVIRONMENT}-$(date +%s)\",
-        \"Comment\": \"$CF_COMMENT\",
-        \"Origins\": {
-          \"Items\": [{
-            \"Id\": \"S3Origin\",
-            \"DomainName\": \"${S3_BUCKET}.s3.amazonaws.com\",
-            \"S3OriginConfig\": {\"OriginAccessIdentity\": \"\"}
-          }],
-          \"Quantity\": 1
-        },
-        \"DefaultCacheBehavior\": {
-          \"TargetOriginId\": \"S3Origin\",
-          \"ViewerProtocolPolicy\": \"redirect-to-https\",
-          \"AllowedMethods\": {\"Quantity\": 2, \"Items\": [\"GET\",\"HEAD\"]},
-          \"CachedMethods\": {\"Quantity\": 2, \"Items\": [\"GET\",\"HEAD\"]},
-          \"ForwardedValues\": {\"QueryString\": false, \"Cookies\": {\"Forward\": \"none\"}}
-        },
-        \"Enabled\": true,
-        \"DefaultRootObject\": \"index.html\",
-        \"ViewerCertificate\": {
-          \"ACMCertificateArn\": \"$CERT_ARN\",
-          \"SSLSupportMethod\": \"sni-only\",
-          \"MinimumProtocolVersion\": \"TLSv1.2_2021\"
-        }
-      }" \
-      --query 'Distribution.Id' --output text)
-
-  aws cloudfront tag-resource --resource "$CF_DIST_ID" \
-    --tags "Items=[{Key=Project,Value=$PROJECT_NAME},{Key=Owner,Value=$OWNER},{Key=Environment,Value=$ENVIRONMENT}]"
-
-  echo "✅ CloudFront with HTTPS ready. Distribution ID: $CF_DIST_ID"
+    echo "🌐 Skipping CloudFront HTTPS and ACM certificate setup (no real domain provided)."
+    # To enable HTTPS and CloudFront, uncomment and configure the following block after you have a real domain:
+    # CERT_ARN=$(aws acm list-certificates --region us-east-1 \
+    #     --query "CertificateSummaryList[?DomainName=='yourdomain.com'].CertificateArn" --output text)
+    #
+    # if [[ -z "$CERT_ARN" ]]; then
+    #   echo "🔐 Requesting new ACM certificate..."
+    #   CERT_ARN=$(aws acm request-certificate \
+    #       --domain-name yourdomain.com \
+    #       --validation-method DNS \
+    #       --tags Key=Project,Value=$PROJECT_NAME Key=Owner,Value=$OWNER Key=Environment,Value=$ENVIRONMENT \
+    #       --region us-east-1 \
+    #       --query 'CertificateArn' --output text)
+    #   echo "⚠️ DNS validation required for yourdomain.com. Validate in ACM console before CloudFront will serve HTTPS."
+    # fi
+    #
+    # CF_DIST_ID=$(aws cloudfront create-distribution \
+    #     --distribution-config "{
+    #       \"CallerReference\": \"${PROJECT_NAME}-${ENVIRONMENT}-$(date +%s)\",
+    #       \"Comment\": \"$CF_COMMENT\",
+    #       \"Origins\": {
+    #         \"Items\": [{
+    #           \"Id\": \"S3Origin\",
+    #           \"DomainName\": \"${S3_BUCKET}.s3.amazonaws.com\",
+    #           \"S3OriginConfig\": {\"OriginAccessIdentity\": \"\"}
+    #         }],
+    #         \"Quantity\": 1
+    #       },
+    #       \"DefaultCacheBehavior\": {
+    #         \"TargetOriginId\": \"S3Origin\",
+    #         \"ViewerProtocolPolicy\": \"redirect-to-https\",
+    #         \"AllowedMethods\": {\"Quantity\": 2, \"Items\": [\"GET\",\"HEAD\"]},
+    #         \"CachedMethods\": {\"Quantity\": 2, \"Items\": [\"GET\",\"HEAD\"]},
+    #         \"ForwardedValues\": {\"QueryString\": false, \"Cookies\": {\"Forward\": \"none\"}}
+    #       },
+    #       \"Enabled\": true,
+    #       \"DefaultRootObject\": \"index.html\",
+    #       \"ViewerCertificate\": {
+    #         \"ACMCertificateArn\": \"$CERT_ARN\",
+    #         \"SSLSupportMethod\": \"sni-only\",
+    #         \"MinimumProtocolVersion\": \"TLSv1.2_2021\"
+    #       }
+    #     }" \
+    #     --query 'Distribution.Id' --output text)
+    #
+    # aws cloudfront tag-resource --resource "$CF_DIST_ID" \
+    #   --tags "Items=[{Key=Project,Value=$PROJECT_NAME},{Key=Owner,Value=$OWNER},{Key=Environment,Value=$ENVIRONMENT}]"
+    #
+    # echo "✅ CloudFront with HTTPS ready. Distribution ID: $CF_DIST_ID"
 
   # ------------------------
   # EC2 Instance
