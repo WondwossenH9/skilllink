@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User, AuthContextType, LoginData, RegisterData } from '../types';
+import { User, AuthContextType, RegisterData } from '../types';
 import { authService } from '../services/authService';
 import toast from 'react-hot-toast';
 
@@ -41,11 +41,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         email,
         password,
       });
-      
+
       authService.storeAuth(authToken, userData);
       setUser(userData);
       setToken(authToken);
-      
+
       toast.success('Logged in successfully!');
     } catch (error: any) {
       const errorMessage = error.response?.data?.error || 'Login failed';
@@ -60,11 +60,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       setLoading(true);
       const { user: newUser, token: authToken } = await authService.register(userData);
-      
+
       authService.storeAuth(authToken, newUser);
       setUser(newUser);
       setToken(authToken);
-      
+
       toast.success('Account created successfully!');
     } catch (error: any) {
       const errorMessage = error.response?.data?.error || 'Registration failed';

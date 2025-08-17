@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext.tsx';
+import { useAuth } from '../../contexts/AuthContext';
 import { LogOut, User, Plus, Search, GitBranch } from 'lucide-react';
 
 const Header: React.FC = () => {
