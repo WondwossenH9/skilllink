@@ -1,8 +1,8 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import { AuthProvider } from './contexts/AuthContext';
-import Layout from './components/layout/Layout';
+import { AuthProvider } from './contexts/AuthContext.tsx';
+import Layout from './components/Layout/Layout';
 import HomePage from './components/pages/HomePage';
 import LoginPage from './components/auth/LoginPage';
 import RegisterPage from './components/auth/RegisterPage';
@@ -19,8 +19,8 @@ function App() {
     <AuthProvider>
       <Router>
         <div className="App min-h-screen bg-gray-50">
-          <Toaster 
-            position="top-right" 
+          <Toaster
+            position="top-right"
             toastOptions={{
               duration: 4000,
               style: {

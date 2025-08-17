@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../contexts/AuthContext.tsx';
 import { LogOut, User, Plus, Search, GitBranch } from 'lucide-react';
 
 const Header: React.FC = () => {
@@ -24,31 +24,31 @@ const Header: React.FC = () => {
 
           {/* Navigation */}
           <nav className="hidden md:flex items-center space-x-6">
-            <Link 
-              to="/skills" 
+            <Link
+              to="/skills"
               className="flex items-center space-x-1 text-gray-700 hover:text-primary-600"
             >
               <Search className="h-4 w-4" />
               <span>Browse Skills</span>
             </Link>
-            
+
             {user && (
               <>
-                <Link 
-                  to="/create-skill" 
+                <Link
+                  to="/create-skill"
                   className="flex items-center space-x-1 text-gray-700 hover:text-primary-600"
                 >
                   <Plus className="h-4 w-4" />
                   <span>Add Skill</span>
                 </Link>
-                <Link 
-                  to="/my-skills" 
+                <Link
+                  to="/my-skills"
                   className="text-gray-700 hover:text-primary-600"
                 >
                   My Skills
                 </Link>
-                <Link 
-                  to="/matches" 
+                <Link
+                  to="/matches"
                   className="text-gray-700 hover:text-primary-600"
                 >
                   Matches
@@ -61,8 +61,8 @@ const Header: React.FC = () => {
           <div className="flex items-center space-x-4">
             {user ? (
               <div className="flex items-center space-x-3">
-                <Link 
-                  to="/profile" 
+                <Link
+                  to="/profile"
                   className="flex items-center space-x-2 text-gray-700 hover:text-primary-600"
                 >
                   <User className="h-4 w-4" />
@@ -78,14 +78,14 @@ const Header: React.FC = () => {
               </div>
             ) : (
               <div className="flex items-center space-x-3">
-                <Link 
-                  to="/login" 
+                <Link
+                  to="/login"
                   className="text-gray-700 hover:text-primary-600"
                 >
                   Login
                 </Link>
-                <Link 
-                  to="/register" 
+                <Link
+                  to="/register"
                   className="btn btn-primary"
                 >
                   Sign Up
