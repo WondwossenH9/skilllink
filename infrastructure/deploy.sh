@@ -52,7 +52,7 @@ deploy() {
     --tagging "TagSet=[{Key=Project,Value=$PROJECT_NAME},{Key=Owner,Value=$OWNER},{Key=Environment,Value=$ENVIRONMENT}]"
 
   echo "📤 Uploading website files..."
-  aws s3 sync ./build s3://$S3_BUCKET --delete
+  aws s3 sync ../frontend/build s3://$S3_BUCKET --delete
 
   # ------------------------
   # CloudFront + SSL
