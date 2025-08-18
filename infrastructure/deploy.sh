@@ -149,12 +149,18 @@ deploy() {
   # ------------------------
   # RDS Instance
   # ------------------------
-  echo "🛢️ Creating RDS instance..."
+  echo "🛢️ Checking for existing RDS instance..."
   DB_INSTANCE_ID="$RDS_NAME_TAG"
   DB_USERNAME="skilllink_user"
   DB_PASSWORD=$(openssl rand -base64 12)
 
-  aws rds create-db-instance \
+  EXISTING_RDS=$(aws rds describe-db-instances --db-instance-identifier $DB_INSTANCE_ID --region $AWS_REGION --query 'DBInstances[0].DBInstanceIdentifier' --output text 2>/dev/null || echo "none")
+  if [[ "$EXISTING_RDS" == "$DB_INSTANCE_ID" ]]; then
+    echo "ℹ️ RDS instance $DB_INSTANCE_ID already exists. Skipping creation."
+  else
+    echo "🛢️ Creating RDS instance..."
+    set +e
+    aws rds create-db-instance \
       --db-instance-identifier $DB_INSTANCE_ID \
       --db-instance-class $RDS_CLASS \
       --engine postgres \
@@ -166,6 +172,14 @@ deploy() {
       --backup-retention-period 7 \
       --tag-list Key=Project,Value=$PROJECT_NAME Key=Owner,Value=$OWNER Key=Environment,Value=$ENVIRONMENT \
       --region $AWS_REGION
+    RDS_STATUS=$?
+    set -e
+    if [[ $RDS_STATUS -ne 0 ]]; then
+      echo "❌ Error: Failed to create RDS instance $DB_INSTANCE_ID. Check AWS Console or logs for details."
+    else
+      echo "✅ RDS instance $DB_INSTANCE_ID created successfully."
+    fi
+  fi
 
   # ------------------------
   # Generate .env.deployment
