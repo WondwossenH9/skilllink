@@ -19,6 +19,10 @@ if [[ "$ENVIRONMENT" != "dev" && "$ENVIRONMENT" != "prod" ]]; then
   exit 1
 fi
 
+# Network defaults
+ALLOWED_SSH_CIDR="${ALLOWED_SSH_CIDR:-0.0.0.0/0}"  # TODO: set to your IP/CIDR
+
+
 # Instance types by environment
 if [[ "$ENVIRONMENT" == "dev" ]]; then
   EC2_TYPE="t2.micro"
@@ -57,9 +61,28 @@ deploy() {
     echo "ℹ️ Bucket $S3_BUCKET already exists. Reusing."
   else
     aws s3 mb "s3://$S3_BUCKET" --region "$AWS_REGION"
+    if [[ $? -ne 0 ]]; then
+      ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+      S3_BUCKET="${S3_BUCKET}-${ACCOUNT_ID}"
+      echo "🆔 Falling back to bucket name with account ID: $S3_BUCKET"
+      if ! aws s3api head-bucket --bucket "$S3_BUCKET" --region "$AWS_REGION" 2>/dev/null; then
+        aws s3 mb "s3://$S3_BUCKET" --region "$AWS_REGION"
+      fi
+    fi
     aws s3api put-public-access-block       --bucket "$S3_BUCKET"       --public-access-block-configuration BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
     aws s3api put-bucket-tagging --bucket "$S3_BUCKET"       --tagging "TagSet=[{Key=Project,Value=$PROJECT_NAME},{Key=Owner,Value=$OWNER},{Key=Environment,Value=$ENVIRONMENT}]"
     echo "✅ Created bucket $S3_BUCKET"
+  fi
+
+  # Ensure frontend build exists
+  if [[ ! -d ../frontend/build ]]; then
+    echo "⚠️ ../frontend/build not found. Attempting to build frontend..."
+    if [[ -f ../frontend/package.json ]]; then
+      (cd ../frontend && npm ci && npm run build)
+    else
+      echo "❌ Frontend build directory missing and no package.json to build from. Aborting."
+      exit 1
+    fi
   fi
 
   echo "📤 Uploading website files..."
@@ -123,7 +146,7 @@ deploy() {
     # Ensure required ingress rules exist
     EXISTING_22=$(aws ec2 describe-security-groups --group-ids $SECURITY_GROUP_ID --query "length(SecurityGroups[0].IpPermissions[?FromPort==\`22\` && IpProtocol=='tcp'])" --output text)
     if [[ "$EXISTING_22" == "0" ]]; then
-      aws ec2 authorize-security-group-ingress --group-id $SECURITY_GROUP_ID --protocol tcp --port 22 --cidr 0.0.0.0/0
+      aws ec2 authorize-security-group-ingress --group-id $SECURITY_GROUP_ID --protocol tcp --port 22 --cidr $ALLOWED_SSH_CIDR
     fi
     EXISTING_3001=$(aws ec2 describe-security-groups --group-ids $SECURITY_GROUP_ID --query "length(SecurityGroups[0].IpPermissions[?FromPort==\`3001\` && IpProtocol=='tcp'])" --output text)
     if [[ "$EXISTING_3001" == "0" ]]; then
@@ -137,9 +160,16 @@ deploy() {
       --vpc-id $VPC_ID \
       --tag-specifications "ResourceType=security-group,Tags=[{Key=Project,Value=$PROJECT_NAME},{Key=Owner,Value=$OWNER},{Key=Environment,Value=$ENVIRONMENT}]" \
       --query 'GroupId' --output text)
-    aws ec2 authorize-security-group-ingress --group-id $SECURITY_GROUP_ID --protocol tcp --port 22 --cidr 0.0.0.0/0
+    aws ec2 authorize-security-group-ingress --group-id $SECURITY_GROUP_ID --protocol tcp --port 22 --cidr $ALLOWED_SSH_CIDR
     aws ec2 authorize-security-group-ingress --group-id $SECURITY_GROUP_ID --protocol tcp --port 3001 --cidr 0.0.0.0/0
     echo "✅ Security group $SECURITY_GROUP_NAME created and configured."
+  fi
+
+  # Ensure SSH is restricted to ALLOWED_SSH_CIDR
+  aws ec2 revoke-security-group-ingress --group-id $SECURITY_GROUP_ID --protocol tcp --port 22 --cidr 0.0.0.0/0 2>/dev/null || true
+  EXISTING_SSH=$(aws ec2 describe-security-groups --group-ids $SECURITY_GROUP_ID --query "length(SecurityGroups[0].IpPermissions[?FromPort==\`22\` && IpProtocol=='tcp' && contains(IpRanges[].CidrIp, '$ALLOWED_SSH_CIDR')])" --output text)
+  if [[ "$EXISTING_SSH" == "0" ]]; then
+    aws ec2 authorize-security-group-ingress --group-id $SECURITY_GROUP_ID --protocol tcp --port 22 --cidr $ALLOWED_SSH_CIDR
   fi
 
   # Prefer reusing an existing instance
@@ -186,14 +216,24 @@ deploy() {
   else
     echo "🛢️ Creating RDS instance..."
     set +e
-    aws rds create-db-instance \
+# Create a dedicated RDS security group that only allows Postgres from EC2 SG
+    RDS_SG_NAME="${PROJECT_NAME}-rds-sg-${ENVIRONMENT}"
+    RDS_SG_ID=$(aws ec2 describe-security-groups --filters "Name=group-name,Values=$RDS_SG_NAME" "Name=vpc-id,Values=$VPC_ID" --query 'SecurityGroups[0].GroupId' --output text --region $AWS_REGION)
+    if [[ "$RDS_SG_ID" == "None" || -z "$RDS_SG_ID" ]]; then
+      RDS_SG_ID=$(aws ec2 create-security-group --group-name "$RDS_SG_NAME" --description "RDS SG for $PROJECT_NAME $ENVIRONMENT" --vpc-id "$VPC_ID" --query 'GroupId' --output text)
+      aws ec2 create-tags --resources "$RDS_SG_ID" --tags Key=Project,Value=$PROJECT_NAME Key=Owner,Value=$OWNER Key=Environment,Value=$ENVIRONMENT
+    fi
+    # Authorize inbound from EC2 SG to Postgres port
+    aws ec2 authorize-security-group-ingress --group-id "$RDS_SG_ID" --protocol tcp --port 5432 --source-group "$SECURITY_GROUP_ID" 2>/dev/null || true
+
+        aws rds create-db-instance \
       --db-instance-identifier $DB_INSTANCE_ID \
       --db-instance-class $RDS_CLASS \
       --engine postgres \
       --master-username $DB_USERNAME \
       --master-user-password $DB_PASSWORD \
       --allocated-storage 20 \
-      --publicly-accessible \
+      --no-publicly-accessible \
       --storage-encrypted \
       --backup-retention-period 7 \
       --tag-list Key=Project,Value=$PROJECT_NAME Key=Owner,Value=$OWNER Key=Environment,Value=$ENVIRONMENT \
@@ -208,6 +248,9 @@ deploy() {
   fi
 
 # Environment file generation (removed stray EOL)
+  echo "⏳ Waiting for RDS instance to be available..."
+  aws rds wait db-instance-available --db-instance-identifier "$DB_INSTANCE_ID" --region "$AWS_REGION"
+
 cat > .env.deployment <<EOF
 S3_BUCKET=$S3_BUCKET
 CLOUDFRONT_DOMAIN=$CF_DOMAIN
