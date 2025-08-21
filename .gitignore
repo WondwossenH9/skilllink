@@ -37,3 +37,14 @@ Thumbs.db
 # AWS
 .aws/
 *.pem
+# Node
+node_modules/
+
+# Env and keys
+infrastructure/.env.deployment
+*.pem
+
+# Build outputs
+frontend/build/
+backend/dist/
+
