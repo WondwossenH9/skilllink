@@ -236,7 +236,7 @@ deploy() {
       --no-publicly-accessible \
       --storage-encrypted \
       --backup-retention-period 7 \
-      --tag-list Key=Project,Value=$PROJECT_NAME Key=Owner,Value=$OWNER Key=Environment,Value=$ENVIRONMENT \
+      --tags Key=Project,Value=$PROJECT_NAME Key=Owner,Value=$OWNER Key=Environment,Value=$ENVIRONMENT \
       --region $AWS_REGION
     RDS_STATUS=$?
     set -e
