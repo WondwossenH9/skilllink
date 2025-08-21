@@ -264,3 +264,23 @@ DB_INSTANCE_ID=$DB_INSTANCE_ID
 DB_NAME=skilllink
 DB_USERNAME=$DB_USERNAME
 DB_PASSWORD=$DB_PASSWORD
+EOF
+
+  echo "✅ .env.deployment file created."
+  echo "Deployment complete for $ENVIRONMENT!"
+  echo "CloudFront: $CF_DOMAIN"
+  echo "EC2: $EC2_PUBLIC_IP"
+}
+
+# ========================
+# Command Line Handling
+# ========================
+case "${1:-deploy}" in
+  deploy)
+    deploy
+    ;;
+  *)
+    echo "Usage: $0 deploy {dev|prod}"
+    exit 1
+    ;;
+esac
