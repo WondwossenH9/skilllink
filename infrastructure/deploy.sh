@@ -41,19 +41,32 @@ deploy() {
   echo "🚀 Starting deployment for $ENVIRONMENT environment..."
 
   # ------------------------
-  # S3 Bucket
   # ------------------------
-  echo "📦 Creating S3 bucket: $S3_BUCKET"
-  aws s3 mb s3://$S3_BUCKET --region $AWS_REGION
-  aws s3api put-public-access-block \
-    --bucket $S3_BUCKET \
-    --public-access-block-configuration BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
-  aws s3api put-bucket-tagging --bucket $S3_BUCKET \
-    --tagging "TagSet=[{Key=Project,Value=$PROJECT_NAME},{Key=Owner,Value=$OWNER},{Key=Environment,Value=$ENVIRONMENT}]"
+  # S3 Bucket (idempotent)
+  # ------------------------
+  # Prefer existing S3_BUCKET from prior deployment file
+  if [[ -f infrastructure/.env.deployment ]]; then
+    # shellcheck disable=SC1091
+    source infrastructure/.env.deployment
+  fi
+
+  S3_BUCKET="${S3_BUCKET:-${PROJECT_NAME}-frontend-${ENVIRONMENT}}"
+
+  echo "📦 Ensuring S3 bucket exists: $S3_BUCKET"
+  if aws s3api head-bucket --bucket "$S3_BUCKET" --region "$AWS_REGION" 2>/dev/null; then
+    echo "ℹ️ Bucket $S3_BUCKET already exists. Reusing."
+  else
+    aws s3 mb "s3://$S3_BUCKET" --region "$AWS_REGION"
+    aws s3api put-public-access-block       --bucket "$S3_BUCKET"       --public-access-block-configuration BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
+    aws s3api put-bucket-tagging --bucket "$S3_BUCKET"       --tagging "TagSet=[{Key=Project,Value=$PROJECT_NAME},{Key=Owner,Value=$OWNER},{Key=Environment,Value=$ENVIRONMENT}]"
+    echo "✅ Created bucket $S3_BUCKET"
+  fi
 
   echo "📤 Uploading website files..."
-  aws s3 sync ../frontend/build s3://$S3_BUCKET --delete
+  aws s3 sync ../frontend/build "s3://$S3_BUCKET" --delete
 
+  # ------------------------
+# ------------------------
   # ------------------------
   # CloudFront + SSL
   # ------------------------
