@@ -75,10 +75,10 @@ deploy() {
   fi
 
   # Ensure frontend build exists
-  if [[ ! -d ../frontend/build ]]; then
-    echo "⚠️ ../frontend/build not found. Attempting to build frontend..."
-    if [[ -f ../frontend/package.json ]]; then
-      (cd ../frontend && npm ci && npm run build)
+  if [[ ! -d frontend/build ]]; then
+    echo "⚠️ frontend/build not found. Attempting to build frontend..."
+    if [[ -f frontend/package.json ]]; then
+      (cd frontend && npm ci && npm run build)
     else
       echo "❌ Frontend build directory missing and no package.json to build from. Aborting."
       exit 1
@@ -86,7 +86,7 @@ deploy() {
   fi
 
   echo "📤 Uploading website files..."
-  aws s3 sync ../frontend/build "s3://$S3_BUCKET" --delete
+  aws s3 sync frontend/build "s3://$S3_BUCKET" --delete
 
   # ------------------------
 # ------------------------
