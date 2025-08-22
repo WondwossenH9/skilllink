@@ -203,21 +203,12 @@ const getUserSkills = async (req, res) => {
   }
 };
 
-module.exports = {
-  createSkill,
-  getSkills,
-  getSkillById,
-  updateSkill,
-  deleteSkill,
-  getUserSkills,
-};
-
 // Add search and match suggestion functionality
 const findSkillMatches = async (req, res) => {
   try {
-    const { skillId } = req.params;
+    const { id } = req.params;
     
-    const skill = await Skill.findByPk(skillId);
+    const skill = await Skill.findByPk(id);
     if (!skill) {
       return res.status(404).json({ error: 'Skill not found' });
     }
