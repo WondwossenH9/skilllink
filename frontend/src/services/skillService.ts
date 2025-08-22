@@ -27,6 +27,11 @@ export const skillService = {
     return response.data;
   },
 
+  async getSkillMatches(id: string): Promise<{ matches: Skill[] }> {
+    const response = await api.get(`/skills/${id}/matches`);
+    return response.data;
+  },
+
   async createSkill(data: SkillFormData): Promise<{ skill: Skill }> {
     const response = await api.post('/skills', data);
     return response.data;
