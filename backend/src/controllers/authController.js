@@ -8,7 +8,7 @@ const register = async (req, res) => {
     // Check if user already exists
     const existingUser = await User.findOne({
       where: {
-        $or: [{ email }, { username }]
+        [require('sequelize').Op.or]: [{ email }, { username }]
       }
     });
 
@@ -51,7 +51,9 @@ const login = async (req, res) => {
     const { email, password } = req.body;
 
     // Find user by email
-    const user = await User.findOne({ where: { email } });
+    const user = await User.findOne({ 
+      where: { email: email } 
+    });
 
     if (!user || !user.isActive) {
       return res.status(401).json({ error: 'Invalid credentials' });
