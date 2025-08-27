@@ -158,7 +158,12 @@ const MatchesPage: React.FC = () => {
         </div>
       ) : (
         <div className="space-y-4">
-          {matches.map((match) => (
+          {matches.map((match) => {
+            // Skip rendering if match data is incomplete
+            if (!match?.offerSkill?.user || !match?.requestSkill?.user) {
+              return null;
+            }
+            return (
             <div key={match.id} className="bg-white rounded-lg shadow p-6">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center space-x-3">
@@ -176,16 +181,16 @@ const MatchesPage: React.FC = () => {
                   <h3 className="font-medium text-gray-900 mb-2">Offering</h3>
                   <div className="flex items-center mb-2">
                     <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center text-primary-600 font-semibold text-sm">
-                      {match.offerSkill.user.firstName.charAt(0)}{match.offerSkill.user.lastName.charAt(0)}
+                      {match.offerSkill.user ? `${match.offerSkill.user.firstName?.charAt(0) || 'U'}${match.offerSkill.user.lastName?.charAt(0) || 'N'}` : 'UN'}
                     </div>
                     <div className="ml-2">
                       <p className="text-sm font-medium text-gray-900">
-                        {match.offerSkill.user.firstName} {match.offerSkill.user.lastName}
+                        {match.offerSkill.user ? `${match.offerSkill.user.firstName || 'Unknown'} ${match.offerSkill.user.lastName || 'User'}` : 'Unknown User'}
                       </p>
                       <div className="flex items-center">
                         <Star className="h-3 w-3 text-yellow-400 mr-1" />
                         <span className="text-xs text-gray-500">
-                          {match.offerSkill.user.rating.toFixed(1)} ({match.offerSkill.user.totalRatings})
+                          {match.offerSkill.user?.rating ? match.offerSkill.user.rating.toFixed(1) : '0.0'} ({match.offerSkill.user?.totalRatings || 0})
                         </span>
                       </div>
                     </div>
@@ -199,16 +204,16 @@ const MatchesPage: React.FC = () => {
                   <h3 className="font-medium text-gray-900 mb-2">Requesting</h3>
                   <div className="flex items-center mb-2">
                     <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center text-primary-600 font-semibold text-sm">
-                      {match.requestSkill.user.firstName.charAt(0)}{match.requestSkill.user.lastName.charAt(0)}
+                      {match.requestSkill.user ? `${match.requestSkill.user.firstName?.charAt(0) || 'U'}${match.requestSkill.user.lastName?.charAt(0) || 'N'}` : 'UN'}
                     </div>
                     <div className="ml-2">
                       <p className="text-sm font-medium text-gray-900">
-                        {match.requestSkill.user.firstName} {match.requestSkill.user.lastName}
+                        {match.requestSkill.user ? `${match.requestSkill.user.firstName || 'Unknown'} ${match.requestSkill.user.lastName || 'User'}` : 'Unknown User'}
                       </p>
                       <div className="flex items-center">
                         <Star className="h-3 w-3 text-yellow-400 mr-1" />
                         <span className="text-xs text-gray-500">
-                          {match.requestSkill.user.rating.toFixed(1)} ({match.requestSkill.user.totalRatings})
+                          {match.requestSkill.user?.rating ? match.requestSkill.user.rating.toFixed(1) : '0.0'} ({match.requestSkill.user?.totalRatings || 0})
                         </span>
                       </div>
                     </div>
@@ -243,7 +248,7 @@ const MatchesPage: React.FC = () => {
                 </div>
 
                 {/* Status Actions */}
-                {match.status === 'pending' && match.offerer.id === match.offerSkill.user.id && (
+                {match.status === 'pending' && match.offerer?.id === match.offerSkill.user?.id && (
                   <div className="flex items-center space-x-2">
                     <button
                       onClick={() => handleUpdateStatus(match.id, 'accepted')}
@@ -276,7 +281,8 @@ const MatchesPage: React.FC = () => {
                 )}
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

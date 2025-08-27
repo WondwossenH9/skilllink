@@ -1,7 +1,7 @@
 import axios, { AxiosResponse } from 'axios';
 import toast from 'react-hot-toast';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
+const API_BASE_URL = 'http://localhost:3001/api';
 
 // Create axios instance
 const api = axios.create({
@@ -42,11 +42,7 @@ api.interceptors.response.use(
         return Promise.reject(error);
       }
       
-      if (status >= 400 && status < 500) {
-        // Client errors
-        const errorMessage = data.error || data.message || 'Request failed';
-        toast.error(errorMessage);
-      } else if (status >= 500) {
+      if (status >= 500) {
         // Server errors
         toast.error('Server error. Please try again later.');
       }

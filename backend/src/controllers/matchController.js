@@ -1,4 +1,5 @@
 const { Match, Skill, User } = require('../models');
+const { Op } = require('sequelize');
 
 const createMatch = async (req, res) => {
   try {
@@ -6,12 +7,12 @@ const createMatch = async (req, res) => {
 
     // Verify skills exist and are active
     const offerSkill = await Skill.findOne({
-      where: { id: offerSkillId, type: 'offer', isActive: true },
+      where: { id: offerSkillId, isActive: true },
       include: [{ association: 'user', attributes: ['id'] }]
     });
 
     const requestSkill = await Skill.findOne({
-      where: { id: requestSkillId, type: 'request', isActive: true },
+      where: { id: requestSkillId, isActive: true },
       include: [{ association: 'user', attributes: ['id'] }]
     });
 
@@ -19,17 +20,22 @@ const createMatch = async (req, res) => {
       return res.status(404).json({ error: 'One or both skills not found' });
     }
 
-    // User can't match their own skills
-    if (offerSkill.user.id === req.user.id || requestSkill.user.id === req.user.id) {
-      return res.status(400).json({ error: 'Cannot match your own skills' });
+    // User can't match their own skills with each other
+    if (offerSkill.user.id === req.user.id && requestSkill.user.id === req.user.id) {
+      return res.status(400).json({ error: 'Cannot match your own skills with each other' });
     }
+
+    // Determine who is the offerer and who is the requester
+    const isCurrentUserOffering = offerSkill.user.id === req.user.id;
+    const requesterId = isCurrentUserOffering ? requestSkill.user.id : req.user.id;
+    const offererId = isCurrentUserOffering ? req.user.id : offerSkill.user.id;
 
     // Check if match already exists
     const existingMatch = await Match.findOne({
       where: {
         offerSkillId,
         requestSkillId,
-        requesterId: req.user.id,
+        requesterId,
       }
     });
 
@@ -40,8 +46,8 @@ const createMatch = async (req, res) => {
     const match = await Match.create({
       offerSkillId,
       requestSkillId,
-      requesterId: req.user.id,
-      offererId: offerSkill.user.id,
+      requesterId,
+      offererId,
       message: message || '',
     });
 
@@ -90,7 +96,7 @@ const getMatches = async (req, res) => {
       whereClause.requesterId = req.user.id;
     } else {
       whereClause = {
-        $or: [
+        [Op.or]: [
           { offererId: req.user.id },
           { requesterId: req.user.id }
         ]

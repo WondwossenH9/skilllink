@@ -218,22 +218,43 @@ const findSkillMatches = async (req, res) => {
     // For requests, find offers in same category
     const oppositeType = skill.type === 'offer' ? 'request' : 'offer';
     
-    const matches = await Skill.findAll({
-      where: {
-        type: oppositeType,
-        category: skill.category,
-        isActive: true,
-        userId: { [Op.not]: skill.userId }, // Exclude own skills
-      },
-      include: [
-        {
-          association: 'user',
-          attributes: ['id', 'username', 'firstName', 'lastName', 'rating'],
-        }
-      ],
-      order: [['createdAt', 'DESC']],
-      limit: 10,
-    });
+    // Get both potential matches (other users' skills) and current user's skills
+    const [potentialMatches, userSkills] = await Promise.all([
+      Skill.findAll({
+        where: {
+          type: oppositeType,
+          category: skill.category,
+          isActive: true,
+          userId: { [Op.not]: skill.userId }, // Other users' skills
+        },
+        include: [
+          {
+            association: 'user',
+            attributes: ['id', 'username', 'firstName', 'lastName', 'rating'],
+          }
+        ],
+        order: [['createdAt', 'DESC']],
+        limit: 5,
+      }),
+      Skill.findAll({
+        where: {
+          type: 'offer', // User's offer skills that can be used in exchange
+          isActive: true,
+          userId: req.user.id, // Current authenticated user's skills
+        },
+        include: [
+          {
+            association: 'user',
+            attributes: ['id', 'username', 'firstName', 'lastName', 'rating'],
+          }
+        ],
+        order: [['createdAt', 'DESC']],
+        limit: 5,
+      })
+    ]);
+
+    // Combine both arrays
+    const matches = [...potentialMatches, ...userSkills];
 
     res.json({ matches });
   } catch (error) {

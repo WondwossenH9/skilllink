@@ -60,11 +60,22 @@ const CreateSkillPage: React.FC = () => {
 
     try {
       setLoading(true);
+      console.log('📤 Sending skill data:', formData);
       await skillService.createSkill(formData);
       toast.success('Skill created successfully!');
       navigate('/my-skills');
-    } catch (error) {
-      toast.error('Failed to create skill');
+    } catch (error: any) {
+      console.log('❌ Skill creation error:', error);
+      console.log('❌ Error response:', error.response?.data);
+      // Handle validation errors with detailed messages
+      if (error.response?.data?.details) {
+        const validationErrors = error.response.data.details;
+        const errorMessages = validationErrors.map((err: any) => err.msg).join(', ');
+        toast.error(errorMessages);
+      } else {
+        const errorMessage = error.response?.data?.error || 'Failed to create skill';
+        toast.error(errorMessage);
+      }
     } finally {
       setLoading(false);
     }

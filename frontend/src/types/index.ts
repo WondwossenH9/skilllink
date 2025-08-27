@@ -5,8 +5,8 @@ export interface User {
   firstName: string;
   lastName: string;
   bio?: string;
-  rating: number;
-  totalRatings: number;
+  rating?: number;
+  totalRatings?: number;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;

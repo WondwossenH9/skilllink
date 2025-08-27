@@ -48,8 +48,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       toast.success('Logged in successfully!');
     } catch (error: any) {
-      const errorMessage = error.response?.data?.error || 'Login failed';
-      toast.error(errorMessage);
+      // Handle validation errors with detailed messages
+      if (error.response?.data?.details) {
+        const validationErrors = error.response.data.details;
+        const errorMessages = validationErrors.map((err: any) => err.msg).join(', ');
+        toast.error(errorMessages);
+      } else {
+        const errorMessage = error.response?.data?.error || 'Login failed';
+        toast.error(errorMessage);
+      }
       throw error;
     } finally {
       setLoading(false);
@@ -67,8 +74,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       toast.success('Account created successfully!');
     } catch (error: any) {
-      const errorMessage = error.response?.data?.error || 'Registration failed';
-      toast.error(errorMessage);
+      // Handle validation errors with detailed messages
+      if (error.response?.data?.details) {
+        const validationErrors = error.response.data.details;
+        const errorMessages = validationErrors.map((err: any) => err.msg).join(', ');
+        toast.error(errorMessages);
+      } else {
+        const errorMessage = error.response?.data?.error || 'Registration failed';
+        toast.error(errorMessage);
+      }
       throw error;
     } finally {
       setLoading(false);

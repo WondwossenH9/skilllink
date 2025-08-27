@@ -112,7 +112,7 @@ const ProfilePage: React.FC = () => {
                 <div className="flex items-center mt-2">
                   <Star className="h-4 w-4 text-yellow-400 mr-1" />
                   <span className="text-sm text-gray-600">
-                    {user.rating.toFixed(1)} ({user.totalRatings} ratings)
+                    {user.rating ? user.rating.toFixed(1) : '0.0'} ({user.totalRatings || 0} ratings)
                   </span>
                 </div>
               </div>
@@ -213,7 +213,7 @@ const ProfilePage: React.FC = () => {
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Stats</h3>
             <div className="space-y-4">
               <div className="text-center">
-                <div className="text-2xl font-bold text-primary-600">{user.rating.toFixed(1)}</div>
+                <div className="text-2xl font-bold text-primary-600">{user.rating ? user.rating.toFixed(1) : '0.0'}</div>
                 <div className="text-sm text-gray-600">Average Rating</div>
               </div>
               <div className="text-center">

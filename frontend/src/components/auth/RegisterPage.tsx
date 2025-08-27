@@ -81,7 +81,7 @@ const RegisterPage: React.FC = () => {
               type="text"
               required
               className="input"
-              placeholder="Username"
+              placeholder="Username (3-30 characters, letters, numbers, underscores only)"
               value={formData.username}
               onChange={handleChange}
             />
@@ -99,7 +99,7 @@ const RegisterPage: React.FC = () => {
               type="password"
               required
               className="input"
-              placeholder="Password (min 6 characters)"
+              placeholder="Password (minimum 6 characters)"
               value={formData.password}
               onChange={handleChange}
             />

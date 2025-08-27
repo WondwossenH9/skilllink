@@ -237,7 +237,7 @@ const SkillsPage: React.FC = () => {
                       <div className="flex items-center">
                         <Star className="h-3 w-3 text-yellow-400 mr-1" />
                         <span className="text-xs text-gray-500">
-                          {skill.user.rating.toFixed(1)} ({skill.user.totalRatings})
+                          {skill.user.rating ? skill.user.rating.toFixed(1) : '0.0'} ({skill.user.totalRatings || 0})
                         </span>
                       </div>
                     </div>

@@ -50,18 +50,46 @@ const SkillDetailPage: React.FC = () => {
   const handleCreateMatch = async () => {
     if (!user || !skill) return;
 
+    // Find a potential match to pair with the current skill
+    // We need to find a skill owned by the current user that can be offered
+    const potentialMatch = potentialMatches.find(match => 
+      match.type === 'offer' && match.user.id === user.id
+    );
+
+    if (!potentialMatch) {
+      toast.error('No suitable skills found to match with. Please browse other skills first.');
+      return;
+    }
+
     try {
       setMatchLoading(true);
+      
+      // Determine which skill is offered and which is requested
+      let offerSkillId, requestSkillId;
+      
+      if (skill.type === 'offer') {
+        // Current user is viewing someone else's offer skill
+        // They want to learn this skill, so they offer one of their own skills in exchange
+        offerSkillId = potentialMatch.id; // Current user's skill (what they're offering)
+        requestSkillId = skill.id; // The skill they want to learn
+      } else {
+        // Current user is viewing someone else's request skill
+        // They want to fulfill this request by offering their skill
+        offerSkillId = potentialMatch.id; // Current user's skill (what they're offering)
+        requestSkillId = skill.id; // The skill they want to fulfill
+      }
+
       await matchService.createMatch({
-        offerSkillId: skill.type === 'offer' ? skill.id : '', // This would need to be selected from potential matches
-        requestSkillId: skill.type === 'request' ? skill.id : '', // This would need to be selected from potential matches
+        offerSkillId,
+        requestSkillId,
         message: matchMessage,
       });
       toast.success('Match request sent successfully!');
       setShowMatchModal(false);
       setMatchMessage('');
-    } catch (error) {
-      toast.error('Failed to create match');
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.error || 'Failed to create match';
+      toast.error(errorMessage);
     } finally {
       setMatchLoading(false);
     }
@@ -237,7 +265,7 @@ const SkillDetailPage: React.FC = () => {
                 <div className="flex items-center">
                   <Star className="h-4 w-4 text-yellow-400 mr-1" />
                   <span className="text-sm text-gray-600">
-                    {skill.user.rating.toFixed(1)} ({skill.user.totalRatings} ratings)
+                    {skill.user.rating ? skill.user.rating.toFixed(1) : '0.0'} ({skill.user.totalRatings || 0} ratings)
                   </span>
                 </div>
               </div>
@@ -283,8 +311,30 @@ const SkillDetailPage: React.FC = () => {
       {/* Match Modal */}
       {showMatchModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+          <div className="bg-white rounded-lg p-6 max-w-lg w-full mx-4">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Request a Match</h3>
+            
+            {/* Show what will be matched */}
+            <div className="bg-gray-50 rounded-lg p-4 mb-4">
+              <h4 className="font-medium text-gray-900 mb-2">Skill Exchange:</h4>
+              <div className="space-y-2">
+                <div className="flex items-center">
+                  <span className="text-sm text-gray-600 w-20">You offer:</span>
+                  <span className="text-sm font-medium">
+                    {potentialMatches.find(match => 
+                      match.type === 'offer' && match.user.id === user?.id
+                    )?.title || 'Your skill'}
+                  </span>
+                </div>
+                <div className="flex items-center">
+                  <span className="text-sm text-gray-600 w-20">You seek:</span>
+                  <span className="text-sm font-medium">
+                    {skill.title}
+                  </span>
+                </div>
+              </div>
+            </div>
+
             <p className="text-gray-600 mb-4">
               Send a message to {skill.user.firstName} about this skill exchange.
             </p>
