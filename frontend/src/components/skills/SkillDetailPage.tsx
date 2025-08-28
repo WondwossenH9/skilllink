@@ -31,8 +31,10 @@ const SkillDetailPage: React.FC = () => {
       setLoading(true);
       const response = await skillService.getSkillById(id!);
       setSkill(response.skill);
-    } catch (error) {
-      toast.error('Failed to load skill details');
+    } catch (error: any) {
+      console.error('Error fetching skill:', error);
+      const errorMessage = error.response?.data?.error || error.message || 'Failed to load skill details';
+      toast.error(errorMessage);
       navigate('/skills');
     } finally {
       setLoading(false);
@@ -43,8 +45,14 @@ const SkillDetailPage: React.FC = () => {
     try {
       const response = await skillService.getSkillMatches(id!);
       setPotentialMatches(response.matches);
+      console.log('Potential matches loaded:', response.matches);
+      console.log('Current user ID:', user?.id);
+      if (user) {
+        const userSkills = response.matches.filter(match => match.user?.id === user.id);
+        console.log('User skills found:', userSkills);
+      }
     } catch (error) {
-      console.error('Failed to load potential matches');
+      console.error('Failed to load potential matches:', error);
     }
   };
 
@@ -268,11 +276,18 @@ const SkillDetailPage: React.FC = () => {
         {!isOwnSkill && user && (
           <button
             onClick={() => {
+              console.log('Request Match clicked. User:', user);
+              console.log('Potential matches:', potentialMatches);
+              
               // Check if user has any skills to offer
               const userSkills = potentialMatches.filter(match => match.user?.id === user.id);
+              console.log('User skills found:', userSkills);
+              
               if (userSkills.length === 0) {
-                toast.error('You need to create a skill first before you can request a match');
-                navigate('/skills/create');
+                toast.error('You need to create a skill first before you can request a match. Redirecting to create skill page...');
+                setTimeout(() => {
+                  navigate('/skills/create');
+                }, 2000);
                 return;
               }
               // If user has skills, show a selection modal or use the first one
