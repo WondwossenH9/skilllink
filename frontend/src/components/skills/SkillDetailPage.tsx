@@ -267,7 +267,18 @@ const SkillDetailPage: React.FC = () => {
         </div>
         {!isOwnSkill && user && (
           <button
-            onClick={() => setShowMatchModal(true)}
+            onClick={() => {
+              // Check if user has any skills to offer
+              const userSkills = potentialMatches.filter(match => match.user?.id === user.id);
+              if (userSkills.length === 0) {
+                toast.error('You need to create a skill first before you can request a match');
+                navigate('/skills/create');
+                return;
+              }
+              // If user has skills, show a selection modal or use the first one
+              setSelectedOfferSkill(userSkills[0]);
+              setShowMatchModal(true);
+            }}
             className="inline-flex items-center px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700"
           >
             <MessageSquare className="h-4 w-4 mr-2" />
@@ -384,96 +395,110 @@ const SkillDetailPage: React.FC = () => {
           <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Create Match</h3>
             
-            <div className="space-y-4 mb-4">
-              <div className="border border-gray-200 rounded-lg p-3">
-                <h4 className="font-medium text-gray-900 mb-2">Skill Exchange</h4>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">You offer:</span>
-                    <span className="text-sm font-medium text-green-600">
-                      {selectedOfferSkill?.title}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">You receive:</span>
-                    <span className="text-sm font-medium text-blue-600">
-                      {skill?.title}
-                    </span>
-                  </div>
-                </div>
-                
-                {/* Compatibility indicators */}
-                {selectedOfferSkill && skill && (
-                  <div className="mt-3 pt-3 border-t border-gray-200">
-                    <h5 className="text-xs font-medium text-gray-700 mb-2">Compatibility</h5>
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between text-xs">
-                        <span>Level:</span>
-                        <span className={`px-2 py-1 rounded ${
-                          selectedOfferSkill.level === skill.level ? 'bg-green-100 text-green-800' :
-                          Math.abs(['beginner', 'intermediate', 'advanced'].indexOf(selectedOfferSkill.level) - 
-                                  ['beginner', 'intermediate', 'advanced'].indexOf(skill.level)) === 1 ? 
-                          'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
-                        }`}>
-                          {selectedOfferSkill.level} ↔ {skill.level}
+            {!selectedOfferSkill ? (
+              <div className="text-center py-4">
+                <p className="text-gray-600 mb-4">Please select a skill to offer in exchange.</p>
+                <button
+                  onClick={() => setShowMatchModal(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="space-y-4 mb-4">
+                  <div className="border border-gray-200 rounded-lg p-3">
+                    <h4 className="font-medium text-gray-900 mb-2">Skill Exchange</h4>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600">You offer:</span>
+                        <span className="text-sm font-medium text-green-600">
+                          {selectedOfferSkill?.title}
                         </span>
                       </div>
-                      <div className="flex items-center justify-between text-xs">
-                        <span>Location:</span>
-                        <span className={`px-2 py-1 rounded ${
-                          selectedOfferSkill.location === skill.location ? 'bg-green-100 text-green-800' :
-                          selectedOfferSkill.location === 'both' || skill.location === 'both' ? 
-                          'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
-                        }`}>
-                          {selectedOfferSkill.location} ↔ {skill.location}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between text-xs">
-                        <span>Category:</span>
-                        <span className={`px-2 py-1 rounded ${
-                          selectedOfferSkill.category === skill.category ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                        }`}>
-                          {selectedOfferSkill.category === skill.category ? 'Same' : 'Different'}
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600">You receive:</span>
+                        <span className="text-sm font-medium text-blue-600">
+                          {skill?.title}
                         </span>
                       </div>
                     </div>
+                    
+                    {/* Compatibility indicators */}
+                    {selectedOfferSkill && skill && (
+                      <div className="mt-3 pt-3 border-t border-gray-200">
+                        <h5 className="text-xs font-medium text-gray-700 mb-2">Compatibility</h5>
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between text-xs">
+                            <span>Level:</span>
+                            <span className={`px-2 py-1 rounded ${
+                              selectedOfferSkill.level === skill.level ? 'bg-green-100 text-green-800' :
+                              Math.abs(['beginner', 'intermediate', 'advanced'].indexOf(selectedOfferSkill.level) - 
+                                      ['beginner', 'intermediate', 'advanced'].indexOf(skill.level)) === 1 ? 
+                              'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
+                            }`}>
+                              {selectedOfferSkill.level} ↔ {skill.level}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between text-xs">
+                            <span>Location:</span>
+                            <span className={`px-2 py-1 rounded ${
+                              selectedOfferSkill.location === skill.location ? 'bg-green-100 text-green-800' :
+                              selectedOfferSkill.location === 'both' || skill.location === 'both' ? 
+                              'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
+                            }`}>
+                              {selectedOfferSkill.location} ↔ {skill.location}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between text-xs">
+                            <span>Category:</span>
+                            <span className={`px-2 py-1 rounded ${
+                              selectedOfferSkill.category === skill.category ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                            }`}>
+                              {selectedOfferSkill.category === skill.category ? 'Same' : 'Different'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Message (optional)
-                </label>
-                <textarea
-                  value={matchMessage}
-                  onChange={(e) => setMatchMessage(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  rows={3}
-                  placeholder="Add a personal message to your match request..."
-                />
-              </div>
-            </div>
-            
-            <div className="flex justify-end space-x-3">
-              <button
-                onClick={() => {
-                  setShowMatchModal(false);
-                  setMatchMessage('');
-                  setSelectedOfferSkill(null);
-                }}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleCreateMatch}
-                disabled={matchLoading}
-                className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {matchLoading ? 'Creating...' : 'Create Match'}
-              </button>
-            </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Message (optional)
+                    </label>
+                    <textarea
+                      value={matchMessage}
+                      onChange={(e) => setMatchMessage(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      rows={3}
+                      placeholder="Add a personal message to your match request..."
+                    />
+                  </div>
+                </div>
+                
+                <div className="flex justify-end space-x-3">
+                  <button
+                    onClick={() => {
+                      setShowMatchModal(false);
+                      setMatchMessage('');
+                      setSelectedOfferSkill(null);
+                    }}
+                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleCreateMatch}
+                    disabled={matchLoading}
+                    className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {matchLoading ? 'Creating...' : 'Create Match'}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
