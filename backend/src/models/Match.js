@@ -23,6 +23,14 @@ const Match = sequelize.define('Match', {
     type: DataTypes.DATE,
     allowNull: true,
   },
+  compatibilityScore: {
+    type: DataTypes.DECIMAL(3, 2), // Score from 0.00 to 1.00
+    allowNull: true,
+    validate: {
+      min: 0,
+      max: 1,
+    },
+  },
 });
 
 module.exports = Match;

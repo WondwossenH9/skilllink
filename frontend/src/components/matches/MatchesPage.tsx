@@ -164,123 +164,172 @@ const MatchesPage: React.FC = () => {
               return null;
             }
             return (
-            <div key={match.id} className="bg-white rounded-lg shadow p-6">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center space-x-3">
-                  {getStatusIcon(match.status)}
-                  {getStatusBadge(match.status)}
-                </div>
-                <div className="text-sm text-gray-500">
-                  {new Date(match.createdAt).toLocaleDateString()}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
-                {/* Offer Skill */}
-                <div className="border border-gray-200 rounded-lg p-4">
-                  <h3 className="font-medium text-gray-900 mb-2">Offering</h3>
-                  <div className="flex items-center mb-2">
-                    <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center text-primary-600 font-semibold text-sm">
-                      {match.offerSkill.user ? `${match.offerSkill.user.firstName?.charAt(0) || 'U'}${match.offerSkill.user.lastName?.charAt(0) || 'N'}` : 'UN'}
-                    </div>
-                    <div className="ml-2">
-                      <p className="text-sm font-medium text-gray-900">
-                        {match.offerSkill.user ? `${match.offerSkill.user.firstName || 'Unknown'} ${match.offerSkill.user.lastName || 'User'}` : 'Unknown User'}
-                      </p>
-                      <div className="flex items-center">
-                        <Star className="h-3 w-3 text-yellow-400 mr-1" />
-                        <span className="text-xs text-gray-500">
-                          {match.offerSkill.user?.rating ? match.offerSkill.user.rating.toFixed(1) : '0.0'} ({match.offerSkill.user?.totalRatings || 0})
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  <h4 className="font-medium text-gray-900">{match.offerSkill.title}</h4>
-                  <p className="text-sm text-gray-600 line-clamp-2">{match.offerSkill.description}</p>
-                </div>
-
-                {/* Request Skill */}
-                <div className="border border-gray-200 rounded-lg p-4">
-                  <h3 className="font-medium text-gray-900 mb-2">Requesting</h3>
-                  <div className="flex items-center mb-2">
-                    <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center text-primary-600 font-semibold text-sm">
-                      {match.requestSkill.user ? `${match.requestSkill.user.firstName?.charAt(0) || 'U'}${match.requestSkill.user.lastName?.charAt(0) || 'N'}` : 'UN'}
-                    </div>
-                    <div className="ml-2">
-                      <p className="text-sm font-medium text-gray-900">
-                        {match.requestSkill.user ? `${match.requestSkill.user.firstName || 'Unknown'} ${match.requestSkill.user.lastName || 'User'}` : 'Unknown User'}
-                      </p>
-                      <div className="flex items-center">
-                        <Star className="h-3 w-3 text-yellow-400 mr-1" />
-                        <span className="text-xs text-gray-500">
-                          {match.requestSkill.user?.rating ? match.requestSkill.user.rating.toFixed(1) : '0.0'} ({match.requestSkill.user?.totalRatings || 0})
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  <h4 className="font-medium text-gray-900">{match.requestSkill.title}</h4>
-                  <p className="text-sm text-gray-600 line-clamp-2">{match.requestSkill.description}</p>
-                </div>
-              </div>
-
-              {match.message && (
-                <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                  <h4 className="font-medium text-gray-900 mb-2">Message</h4>
-                  <p className="text-gray-700">{match.message}</p>
-                </div>
-              )}
-
-              {/* Actions */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                  <Link
-                    to={`/skills/${match.offerSkill.id}`}
-                    className="text-primary-600 hover:text-primary-700 text-sm font-medium"
-                  >
-                    View Offer →
-                  </Link>
-                  <Link
-                    to={`/skills/${match.requestSkill.id}`}
-                    className="text-primary-600 hover:text-primary-700 text-sm font-medium"
-                  >
-                    View Request →
-                  </Link>
-                </div>
-
-                {/* Status Actions */}
-                {match.status === 'pending' && match.offerer?.id === match.offerSkill.user?.id && (
+              <div key={match.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                {/* Match Header */}
+                <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center space-x-2">
-                    <button
-                      onClick={() => handleUpdateStatus(match.id, 'accepted')}
-                      disabled={updatingId === match.id}
-                      className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 disabled:opacity-50"
-                    >
-                      <Check className="h-3 w-3 mr-1" />
-                      Accept
-                    </button>
-                    <button
-                      onClick={() => handleUpdateStatus(match.id, 'rejected')}
-                      disabled={updatingId === match.id}
-                      className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 disabled:opacity-50"
-                    >
-                      <X className="h-3 w-3 mr-1" />
-                      Reject
-                    </button>
+                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                      match.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                      match.status === 'accepted' ? 'bg-green-100 text-green-800' :
+                      match.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                      'bg-blue-100 text-blue-800'
+                    }`}>
+                      {match.status.charAt(0).toUpperCase() + match.status.slice(1)}
+                    </span>
+                    {match.compatibilityScore && (
+                      <div className="flex items-center space-x-1">
+                        <span className="text-xs text-gray-500">Compatibility:</span>
+                        <span className={`text-xs font-medium ${
+                          match.compatibilityScore >= 0.8 ? 'text-green-600' :
+                          match.compatibilityScore >= 0.6 ? 'text-yellow-600' :
+                          'text-red-600'
+                        }`}>
+                          {match.compatibilityScore.toFixed(2)}
+                        </span>
+                        <div className="w-8 h-1 bg-gray-200 rounded-full overflow-hidden">
+                          <div 
+                            className={`h-full rounded-full ${
+                              match.compatibilityScore >= 0.8 ? 'bg-green-500' :
+                              match.compatibilityScore >= 0.6 ? 'bg-yellow-500' :
+                              'bg-red-500'
+                            }`}
+                            style={{ width: `${match.compatibilityScore * 100}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <span className="text-xs text-gray-500">
+                    {new Date(match.createdAt).toLocaleDateString()}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Offer Skill */}
+                  <div className="border border-gray-200 rounded-lg p-4">
+                    <h3 className="font-medium text-gray-900 mb-2">Offering</h3>
+                    <div className="flex items-center mb-2">
+                      <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center text-primary-600 font-semibold text-sm">
+                        {match.offerSkill.user ? `${match.offerSkill.user.firstName?.charAt(0) || 'U'}${match.offerSkill.user.lastName?.charAt(0) || 'N'}` : 'UN'}
+                      </div>
+                      <div className="ml-2">
+                        <p className="text-sm font-medium text-gray-900">
+                          {match.offerSkill.user ? `${match.offerSkill.user.firstName || 'Unknown'} ${match.offerSkill.user.lastName || 'User'}` : 'Unknown User'}
+                        </p>
+                        <div className="flex items-center">
+                          <Star className="h-3 w-3 text-yellow-400 mr-1" />
+                          <span className="text-xs text-gray-500">
+                            {match.offerSkill.user?.rating ? match.offerSkill.user.rating.toFixed(1) : '0.0'} ({match.offerSkill.user?.totalRatings || 0})
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <h4 className="font-medium text-gray-900">{match.offerSkill.title}</h4>
+                    <p className="text-sm text-gray-600 line-clamp-2">{match.offerSkill.description}</p>
+                    <div className="flex items-center gap-2 mt-2">
+                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                        match.offerSkill.level === 'beginner' ? 'bg-yellow-100 text-yellow-800' :
+                        match.offerSkill.level === 'intermediate' ? 'bg-orange-100 text-orange-800' :
+                        'bg-red-100 text-red-800'
+                      }`}>
+                        {match.offerSkill.level}
+                      </span>
+                      <span className="text-xs text-gray-500">{match.offerSkill.location}</span>
+                    </div>
+                  </div>
+
+                  {/* Request Skill */}
+                  <div className="border border-gray-200 rounded-lg p-4">
+                    <h3 className="font-medium text-gray-900 mb-2">Seeking</h3>
+                    <div className="flex items-center mb-2">
+                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-semibold text-sm">
+                        {match.requestSkill.user ? `${match.requestSkill.user.firstName?.charAt(0) || 'U'}${match.requestSkill.user.lastName?.charAt(0) || 'N'}` : 'UN'}
+                      </div>
+                      <div className="ml-2">
+                        <p className="text-sm font-medium text-gray-900">
+                          {match.requestSkill.user ? `${match.requestSkill.user.firstName || 'Unknown'} ${match.requestSkill.user.lastName || 'User'}` : 'Unknown User'}
+                        </p>
+                        <div className="flex items-center">
+                          <Star className="h-3 w-3 text-yellow-400 mr-1" />
+                          <span className="text-xs text-gray-500">
+                            {match.requestSkill.user?.rating ? match.requestSkill.user.rating.toFixed(1) : '0.0'} ({match.requestSkill.user?.totalRatings || 0})
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <h4 className="font-medium text-gray-900">{match.requestSkill.title}</h4>
+                    <p className="text-sm text-gray-600 line-clamp-2">{match.requestSkill.description}</p>
+                    <div className="flex items-center gap-2 mt-2">
+                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                        match.requestSkill.level === 'beginner' ? 'bg-yellow-100 text-yellow-800' :
+                        match.requestSkill.level === 'intermediate' ? 'bg-orange-100 text-orange-800' :
+                        'bg-red-100 text-red-800'
+                      }`}>
+                        {match.requestSkill.level}
+                      </span>
+                      <span className="text-xs text-gray-500">{match.requestSkill.location}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {match.message && (
+                  <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                    <h4 className="font-medium text-gray-900 mb-2">Message</h4>
+                    <p className="text-gray-700">{match.message}</p>
                   </div>
                 )}
 
-                {match.status === 'accepted' && (
-                  <button
-                    onClick={() => handleUpdateStatus(match.id, 'completed')}
-                    disabled={updatingId === match.id}
-                    className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
-                  >
-                    <Star className="h-3 w-3 mr-1" />
-                    Mark Complete
-                  </button>
-                )}
+                {/* Actions */}
+                <div className="flex items-center justify-between mt-4">
+                  <div className="flex items-center space-x-4">
+                    <Link
+                      to={`/skills/${match.offerSkill.id}`}
+                      className="text-primary-600 hover:text-primary-700 text-sm font-medium"
+                    >
+                      View Offer →
+                    </Link>
+                    <Link
+                      to={`/skills/${match.requestSkill.id}`}
+                      className="text-primary-600 hover:text-primary-700 text-sm font-medium"
+                    >
+                      View Request →
+                    </Link>
+                  </div>
+
+                  {/* Status Actions */}
+                  {match.status === 'pending' && match.offerer?.id === match.offerSkill.user?.id && (
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => handleUpdateStatus(match.id, 'accepted')}
+                        disabled={updatingId === match.id}
+                        className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 disabled:opacity-50"
+                      >
+                        <Check className="h-3 w-3 mr-1" />
+                        Accept
+                      </button>
+                      <button
+                        onClick={() => handleUpdateStatus(match.id, 'rejected')}
+                        disabled={updatingId === match.id}
+                        className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 disabled:opacity-50"
+                      >
+                        <X className="h-3 w-3 mr-1" />
+                        Reject
+                      </button>
+                    </div>
+                  )}
+
+                  {match.status === 'accepted' && (
+                    <button
+                      onClick={() => handleUpdateStatus(match.id, 'completed')}
+                      disabled={updatingId === match.id}
+                      className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      <Star className="h-3 w-3 mr-1" />
+                      Mark Complete
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
             );
           })}
         </div>

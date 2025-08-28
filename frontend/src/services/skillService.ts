@@ -7,13 +7,26 @@ export interface SkillsResponse {
 }
 
 export interface SkillFilters {
-  type?: 'offer' | 'request';
   category?: string;
+  type?: 'offer' | 'request';
   level?: 'beginner' | 'intermediate' | 'advanced';
   location?: 'online' | 'in-person' | 'both';
   search?: string;
   page?: number;
   limit?: number;
+}
+
+export interface SkillRecommendationsResponse {
+  recommendations: Skill[];
+  preferences: {
+    topCategories: string[];
+    preferredTypes: string[];
+    preferredLevels: string[];
+    topTags: string[];
+    categoryCount: Record<string, number>;
+    typeCount: Record<string, number>;
+    levelCount: Record<string, number>;
+  };
 }
 
 export const skillService = {
@@ -29,6 +42,11 @@ export const skillService = {
 
   async getSkillMatches(id: string): Promise<{ matches: Skill[] }> {
     const response = await api.get(`/skills/${id}/matches`);
+    return response.data;
+  },
+
+  async getSkillRecommendations(): Promise<SkillRecommendationsResponse> {
+    const response = await api.get('/skills/recommendations');
     return response.data;
   },
 

@@ -17,6 +17,7 @@ const SkillDetailPage: React.FC = () => {
   const [showMatchModal, setShowMatchModal] = useState(false);
   const [matchMessage, setMatchMessage] = useState('');
   const [potentialMatches, setPotentialMatches] = useState<Skill[]>([]);
+  const [selectedOfferSkill, setSelectedOfferSkill] = useState<Skill | null>(null);
 
   useEffect(() => {
     if (id) {
@@ -48,18 +49,7 @@ const SkillDetailPage: React.FC = () => {
   };
 
   const handleCreateMatch = async () => {
-    if (!user || !skill) return;
-
-    // Find a potential match to pair with the current skill
-    // We need to find a skill owned by the current user that can be offered
-    const potentialMatch = potentialMatches.find(match => 
-      match.type === 'offer' && match.user.id === user.id
-    );
-
-    if (!potentialMatch) {
-      toast.error('No suitable skills found to match with. Please browse other skills first.');
-      return;
-    }
+    if (!user || !skill || !selectedOfferSkill) return;
 
     try {
       setMatchLoading(true);
@@ -70,23 +60,28 @@ const SkillDetailPage: React.FC = () => {
       if (skill.type === 'offer') {
         // Current user is viewing someone else's offer skill
         // They want to learn this skill, so they offer one of their own skills in exchange
-        offerSkillId = potentialMatch.id; // Current user's skill (what they're offering)
+        offerSkillId = selectedOfferSkill.id; // Current user's skill (what they're offering)
         requestSkillId = skill.id; // The skill they want to learn
       } else {
         // Current user is viewing someone else's request skill
         // They want to fulfill this request by offering their skill
-        offerSkillId = potentialMatch.id; // Current user's skill (what they're offering)
+        offerSkillId = selectedOfferSkill.id; // Current user's skill (what they're offering)
         requestSkillId = skill.id; // The skill they want to fulfill
       }
 
-      await matchService.createMatch({
+      const response = await matchService.createMatch({
         offerSkillId,
         requestSkillId,
         message: matchMessage,
       });
+      
       toast.success('Match request sent successfully!');
       setShowMatchModal(false);
       setMatchMessage('');
+      setSelectedOfferSkill(null);
+      
+      // Optionally refresh the potential matches
+      fetchPotentialMatches();
     } catch (error: any) {
       const errorMessage = error.response?.data?.error || 'Failed to create match';
       toast.error(errorMessage);
@@ -120,6 +115,118 @@ const SkillDetailPage: React.FC = () => {
         {level.charAt(0).toUpperCase() + level.slice(1)} Level
       </span>
     );
+  };
+
+  const renderPotentialMatches = () => {
+    if (potentialMatches.length === 0) {
+      return (
+        <div className="text-center py-8">
+          <p className="text-gray-500">No potential matches found for this skill.</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Potential Matches</h3>
+        {potentialMatches.map((match) => (
+          <div key={match.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <div className="flex items-center mb-2">
+                  <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center text-primary-600 font-semibold text-sm">
+                    {match.user ? `${match.user.firstName?.charAt(0) || 'U'}${match.user.lastName?.charAt(0) || 'N'}` : 'UN'}
+                  </div>
+                  <div className="ml-2">
+                    <p className="text-sm font-medium text-gray-900">
+                      {match.user ? `${match.user.firstName || 'Unknown'} ${match.user.lastName || 'User'}` : 'Unknown User'}
+                    </p>
+                    <div className="flex items-center">
+                      <Star className="h-3 w-3 text-yellow-400 mr-1" />
+                      <span className="text-xs text-gray-500">
+                        {match.user?.rating ? match.user.rating.toFixed(1) : '0.0'} ({match.user?.totalRatings || 0})
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-2 mb-2">
+                  <h4 className="font-medium text-gray-900">{match.title}</h4>
+                  {getStatusBadge(match.type)}
+                  {getLevelBadge(match.level)}
+                </div>
+                
+                <p className="text-sm text-gray-600 line-clamp-2 mb-2">{match.description}</p>
+                
+                <div className="flex items-center gap-4 text-xs text-gray-500">
+                  <div className="flex items-center">
+                    <MapPin className="h-3 w-3 mr-1" />
+                    {match.location}
+                  </div>
+                  {match.duration && (
+                    <div className="flex items-center">
+                      <Clock className="h-3 w-3 mr-1" />
+                      {match.duration}
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              <div className="ml-4 text-right">
+                {match.matchScore !== undefined && (
+                  <div className="mb-2">
+                    <div className="text-sm font-medium text-gray-900">
+                      Match Score: {match.matchScore.toFixed(2)}
+                    </div>
+                    <div className="w-16 h-2 bg-gray-200 rounded-full overflow-hidden">
+                      <div 
+                        className={`h-full rounded-full ${
+                          match.matchScore >= 0.8 ? 'bg-green-500' :
+                          match.matchScore >= 0.6 ? 'bg-yellow-500' :
+                          'bg-red-500'
+                        }`}
+                        style={{ width: `${match.matchScore * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+                
+                {match.user?.id === user?.id ? (
+                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                    Your Skill
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => handleMatchWithSkill(match)}
+                    className="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium bg-primary-600 text-white hover:bg-primary-700 transition-colors"
+                  >
+                    <MessageSquare className="h-3 w-3 mr-1" />
+                    Match
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  const handleMatchWithSkill = (selectedSkill: Skill) => {
+    if (!user) {
+      toast.error('Please log in to create matches');
+      return;
+    }
+
+    // Check if the selected skill belongs to the current user
+    if (selectedSkill.user.id === user.id) {
+      // User is selecting their own skill to offer
+      setSelectedOfferSkill(selectedSkill);
+      setShowMatchModal(true);
+    } else {
+      // User is selecting someone else's skill - this shouldn't happen in normal flow
+      toast.error('Invalid match selection');
+    }
   };
 
   if (loading) {
@@ -209,44 +316,7 @@ const SkillDetailPage: React.FC = () => {
           </div>
 
           {/* Potential Matches */}
-          {potentialMatches.length > 0 && (
-            <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">Potential Matches</h2>
-              <div className="space-y-4">
-                {potentialMatches.slice(0, 3).map(match => (
-                  <div key={match.id} className="border border-gray-200 rounded-lg p-4">
-                    <div className="flex justify-between items-start mb-2">
-                      <h3 className="font-medium text-gray-900">{match.title}</h3>
-                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                        match.type === 'offer' 
-                          ? 'bg-green-100 text-green-800' 
-                          : 'bg-blue-100 text-blue-800'
-                      }`}>
-                        {match.type === 'offer' ? 'Offering' : 'Seeking'}
-                      </span>
-                    </div>
-                    <p className="text-gray-600 text-sm mb-3 line-clamp-2">{match.description}</p>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <div className="w-6 h-6 bg-primary-100 rounded-full flex items-center justify-center text-primary-600 font-semibold text-xs">
-                          {match.user.firstName.charAt(0)}{match.user.lastName.charAt(0)}
-                        </div>
-                        <span className="ml-2 text-sm text-gray-700">
-                          {match.user.firstName} {match.user.lastName}
-                        </span>
-                      </div>
-                      <button
-                        onClick={() => navigate(`/skills/${match.id}`)}
-                        className="text-primary-600 hover:text-primary-700 text-sm font-medium"
-                      >
-                        View Details →
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          {renderPotentialMatches()}
         </div>
 
         {/* Sidebar */}
@@ -311,53 +381,97 @@ const SkillDetailPage: React.FC = () => {
       {/* Match Modal */}
       {showMatchModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-lg w-full mx-4">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Request a Match</h3>
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Create Match</h3>
             
-            {/* Show what will be matched */}
-            <div className="bg-gray-50 rounded-lg p-4 mb-4">
-              <h4 className="font-medium text-gray-900 mb-2">Skill Exchange:</h4>
-              <div className="space-y-2">
-                <div className="flex items-center">
-                  <span className="text-sm text-gray-600 w-20">You offer:</span>
-                  <span className="text-sm font-medium">
-                    {potentialMatches.find(match => 
-                      match.type === 'offer' && match.user.id === user?.id
-                    )?.title || 'Your skill'}
-                  </span>
+            <div className="space-y-4 mb-4">
+              <div className="border border-gray-200 rounded-lg p-3">
+                <h4 className="font-medium text-gray-900 mb-2">Skill Exchange</h4>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">You offer:</span>
+                    <span className="text-sm font-medium text-green-600">
+                      {selectedOfferSkill?.title}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">You receive:</span>
+                    <span className="text-sm font-medium text-blue-600">
+                      {skill?.title}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-center">
-                  <span className="text-sm text-gray-600 w-20">You seek:</span>
-                  <span className="text-sm font-medium">
-                    {skill.title}
-                  </span>
-                </div>
+                
+                {/* Compatibility indicators */}
+                {selectedOfferSkill && skill && (
+                  <div className="mt-3 pt-3 border-t border-gray-200">
+                    <h5 className="text-xs font-medium text-gray-700 mb-2">Compatibility</h5>
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span>Level:</span>
+                        <span className={`px-2 py-1 rounded ${
+                          selectedOfferSkill.level === skill.level ? 'bg-green-100 text-green-800' :
+                          Math.abs(['beginner', 'intermediate', 'advanced'].indexOf(selectedOfferSkill.level) - 
+                                  ['beginner', 'intermediate', 'advanced'].indexOf(skill.level)) === 1 ? 
+                          'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
+                        }`}>
+                          {selectedOfferSkill.level} ↔ {skill.level}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span>Location:</span>
+                        <span className={`px-2 py-1 rounded ${
+                          selectedOfferSkill.location === skill.location ? 'bg-green-100 text-green-800' :
+                          selectedOfferSkill.location === 'both' || skill.location === 'both' ? 
+                          'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
+                        }`}>
+                          {selectedOfferSkill.location} ↔ {skill.location}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span>Category:</span>
+                        <span className={`px-2 py-1 rounded ${
+                          selectedOfferSkill.category === skill.category ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {selectedOfferSkill.category === skill.category ? 'Same' : 'Different'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Message (optional)
+                </label>
+                <textarea
+                  value={matchMessage}
+                  onChange={(e) => setMatchMessage(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  rows={3}
+                  placeholder="Add a personal message to your match request..."
+                />
               </div>
             </div>
-
-            <p className="text-gray-600 mb-4">
-              Send a message to {skill.user.firstName} about this skill exchange.
-            </p>
-            <textarea
-              value={matchMessage}
-              onChange={(e) => setMatchMessage(e.target.value)}
-              placeholder="Introduce yourself and explain why you're interested in this skill exchange..."
-              rows={4}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500 mb-4"
-            />
+            
             <div className="flex justify-end space-x-3">
               <button
-                onClick={() => setShowMatchModal(false)}
-                className="px-4 py-2 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
+                onClick={() => {
+                  setShowMatchModal(false);
+                  setMatchMessage('');
+                  setSelectedOfferSkill(null);
+                }}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleCreateMatch}
                 disabled={matchLoading}
-                className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50"
+                className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                {matchLoading ? 'Sending...' : 'Send Request'}
+                {matchLoading ? 'Creating...' : 'Create Match'}
               </button>
             </div>
           </div>

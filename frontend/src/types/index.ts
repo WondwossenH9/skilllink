@@ -21,10 +21,12 @@ export interface Skill {
   level: 'beginner' | 'intermediate' | 'advanced';
   duration?: string;
   location: 'online' | 'in-person' | 'both';
-  tags: string[];
   isActive: boolean;
+  tags: string[];
   userId: string;
   user: User;
+  matchScore?: number; // Added for match scoring
+  recommendationScore?: number; // Added for recommendation scoring
   createdAt: string;
   updatedAt: string;
 }
@@ -39,6 +41,7 @@ export interface Match {
   requestSkillId: string;
   requesterId: string;
   offererId: string;
+  compatibilityScore?: number; // Added for compatibility scoring
   offerSkill: Skill;
   requestSkill: Skill;
   requester: User;

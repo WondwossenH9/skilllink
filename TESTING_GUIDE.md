@@ -175,3 +175,4 @@ All accounts use password: `password123`
 ## 🎉 Happy Testing!
 
 Your SkillLink application is now fully functional with realistic data. Test all the features and enjoy the skill exchange experience!
+

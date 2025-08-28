@@ -37,3 +37,4 @@ Write-Host "1. Register a new account" -ForegroundColor White
 Write-Host "2. Create skill offers or requests" -ForegroundColor White
 Write-Host "3. Browse and match with other users" -ForegroundColor White
 Write-Host "4. Manage your matches and skills" -ForegroundColor White
+

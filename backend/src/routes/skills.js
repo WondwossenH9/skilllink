@@ -6,7 +6,8 @@ const {
   updateSkill, 
   deleteSkill,
   getUserSkills,
-  findSkillMatches
+  findSkillMatches,
+  getSkillRecommendations
 } = require('../controllers/skillController');
 const { authenticate, optionalAuth } = require('../middleware/auth');
 const { skillValidation, handleValidationErrors } = require('../middleware/validation');
@@ -14,7 +15,9 @@ const { skillValidation, handleValidationErrors } = require('../middleware/valid
 const router = express.Router();
 
 router.get('/', optionalAuth, getSkills);
+router.get('/recommendations', authenticate, getSkillRecommendations);
 router.get('/my-skills', authenticate, getUserSkills);
+
 router.get('/:id', optionalAuth, getSkillById);
 router.get('/:id/matches', optionalAuth, findSkillMatches);
 router.post('/', authenticate, skillValidation, handleValidationErrors, createSkill);
