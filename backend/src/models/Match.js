@@ -31,6 +31,23 @@ const Match = sequelize.define('Match', {
       max: 1,
     },
   },
+  // Foreign key fields
+  offerSkillId: {
+    type: DataTypes.UUID,
+    allowNull: false,
+  },
+  requestSkillId: {
+    type: DataTypes.UUID,
+    allowNull: false,
+  },
+  requesterId: {
+    type: DataTypes.UUID,
+    allowNull: false,
+  },
+  offererId: {
+    type: DataTypes.UUID,
+    allowNull: false,
+  },
 });
 
 module.exports = Match;

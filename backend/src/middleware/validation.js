@@ -60,6 +60,16 @@ const skillValidation = [
 ];
 
 const matchValidation = [
+  body('offerSkillId')
+    .notEmpty()
+    .withMessage('Offer skill ID is required')
+    .isUUID()
+    .withMessage('Offer skill ID must be a valid UUID'),
+  body('requestSkillId')
+    .notEmpty()
+    .withMessage('Request skill ID is required')
+    .isUUID()
+    .withMessage('Request skill ID must be a valid UUID'),
   body('message')
     .optional()
     .isLength({ max: 500 })

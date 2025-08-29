@@ -1,6 +1,112 @@
 const { Match, Skill, User } = require('../models');
 const { Op } = require('sequelize');
 
+// Helper functions (moved to top to avoid hoisting issues)
+const calculateLevelCompatibility = (level1, level2) => {
+  const levels = { 'beginner': 1, 'intermediate': 2, 'advanced': 3 };
+  const diff = Math.abs(levels[level1] - levels[level2]);
+  
+  if (diff === 0) return 1.0;
+  if (diff === 1) return 0.8;
+  return 0.3;
+};
+
+const calculateLocationCompatibility = (location1, location2) => {
+  if (location1 === location2) return 1.0;
+  if (location1 === 'both' || location2 === 'both') return 0.8;
+  return 0.2;
+};
+
+const calculateSkillQuality = (skill) => {
+  let score = 0.5;
+
+  if (skill.description && skill.description.length > 50) score += 0.2;
+  if (skill.description && skill.description.length > 100) score += 0.1;
+  if (skill.tags && skill.tags.length > 0) score += 0.1;
+  if (skill.tags && skill.tags.length > 2) score += 0.1;
+  if (skill.duration) score += 0.1;
+
+  return Math.min(score, 1.0);
+};
+
+// Enhanced validation for match compatibility
+const validateMatchCompatibility = async (offerSkill, requestSkill, currentUserId) => {
+  // Check if skills are from different users
+  if (offerSkill.userId === requestSkill.userId) {
+    return { isValid: false, error: 'Cannot match skills from the same user' };
+  }
+
+  // Check if current user owns one of the skills
+  const isCurrentUserInvolved = offerSkill.userId === currentUserId || requestSkill.userId === currentUserId;
+  if (!isCurrentUserInvolved) {
+    return { isValid: false, error: 'You must own one of the skills to create a match' };
+  }
+
+  // Check level compatibility
+  const levelCompatibility = calculateLevelCompatibility(offerSkill.level, requestSkill.level);
+  if (levelCompatibility < 0.3) {
+    return { isValid: false, error: 'Skill levels are too different for an effective match' };
+  }
+
+  // Check location compatibility
+  const locationCompatibility = calculateLocationCompatibility(offerSkill.location, requestSkill.location);
+  if (locationCompatibility < 0.2) {
+    return { isValid: false, error: 'Location preferences are incompatible' };
+  }
+
+  // Check if users have minimum ratings (optional but recommended)
+  const offerUserRating = offerSkill.user.rating || 0;
+  const requestUserRating = requestSkill.user.rating || 0;
+  const totalOfferRatings = offerSkill.user.totalRatings || 0;
+  const totalRequestRatings = requestSkill.user.totalRatings || 0;
+
+  // Warn about low-rated users but don't block
+  if ((offerUserRating < 3.0 && totalOfferRatings > 5) || (requestUserRating < 3.0 && totalRequestRatings > 5)) {
+    console.warn(`Low-rated user in match: Offer user rating: ${offerUserRating}, Request user rating: ${requestUserRating}`);
+  }
+
+  return { isValid: true };
+};
+
+// Calculate overall match compatibility score
+const calculateMatchCompatibilityScore = (offerSkill, requestSkill) => {
+  let score = 0;
+  const weights = {
+    levelCompatibility: 0.25,
+    locationCompatibility: 0.20,
+    categoryMatch: 0.15,
+    userRatingBalance: 0.20,
+    skillQuality: 0.20
+  };
+
+  // Level compatibility
+  const levelScore = calculateLevelCompatibility(offerSkill.level, requestSkill.level);
+  score += levelScore * weights.levelCompatibility;
+
+  // Location compatibility
+  const locationScore = calculateLocationCompatibility(offerSkill.location, requestSkill.location);
+  score += locationScore * weights.locationCompatibility;
+
+  // Category match (same category is better)
+  const categoryScore = offerSkill.category === requestSkill.category ? 1.0 : 0.5;
+  score += categoryScore * weights.categoryMatch;
+
+  // User rating balance (similar ratings are better)
+  const offerRating = offerSkill.user.rating || 0;
+  const requestRating = requestSkill.user.rating || 0;
+  const ratingDiff = Math.abs(offerRating - requestRating);
+  const ratingBalanceScore = Math.max(0, 1 - (ratingDiff / 5));
+  score += ratingBalanceScore * weights.userRatingBalance;
+
+  // Skill quality (based on description, tags, etc.)
+  const offerQuality = calculateSkillQuality(offerSkill);
+  const requestQuality = calculateSkillQuality(requestSkill);
+  const qualityScore = (offerQuality + requestQuality) / 2;
+  score += qualityScore * weights.skillQuality;
+
+  return Math.round(score * 100) / 100;
+};
+
 const createMatch = async (req, res) => {
   try {
     const { offerSkillId, requestSkillId, message } = req.body;
@@ -202,112 +308,6 @@ const updateMatchStatus = async (req, res) => {
     console.error('Update match status error:', error);
     res.status(500).json({ error: 'Server error' });
   }
-};
-
-// Enhanced validation for match compatibility
-const validateMatchCompatibility = async (offerSkill, requestSkill, currentUserId) => {
-  // Check if skills are from different users
-  if (offerSkill.userId === requestSkill.userId) {
-    return { isValid: false, error: 'Cannot match skills from the same user' };
-  }
-
-  // Check if current user owns one of the skills
-  const isCurrentUserInvolved = offerSkill.userId === currentUserId || requestSkill.userId === currentUserId;
-  if (!isCurrentUserInvolved) {
-    return { isValid: false, error: 'You must own one of the skills to create a match' };
-  }
-
-  // Check level compatibility
-  const levelCompatibility = calculateLevelCompatibility(offerSkill.level, requestSkill.level);
-  if (levelCompatibility < 0.3) {
-    return { isValid: false, error: 'Skill levels are too different for an effective match' };
-  }
-
-  // Check location compatibility
-  const locationCompatibility = calculateLocationCompatibility(offerSkill.location, requestSkill.location);
-  if (locationCompatibility < 0.2) {
-    return { isValid: false, error: 'Location preferences are incompatible' };
-  }
-
-  // Check if users have minimum ratings (optional but recommended)
-  const offerUserRating = offerSkill.user.rating || 0;
-  const requestUserRating = requestSkill.user.rating || 0;
-  const totalOfferRatings = offerSkill.user.totalRatings || 0;
-  const totalRequestRatings = requestSkill.user.totalRatings || 0;
-
-  // Warn about low-rated users but don't block
-  if ((offerUserRating < 3.0 && totalOfferRatings > 5) || (requestUserRating < 3.0 && totalRequestRatings > 5)) {
-    console.warn(`Low-rated user in match: Offer user rating: ${offerUserRating}, Request user rating: ${requestUserRating}`);
-  }
-
-  return { isValid: true };
-};
-
-// Calculate overall match compatibility score
-const calculateMatchCompatibilityScore = (offerSkill, requestSkill) => {
-  let score = 0;
-  const weights = {
-    levelCompatibility: 0.25,
-    locationCompatibility: 0.20,
-    categoryMatch: 0.15,
-    userRatingBalance: 0.20,
-    skillQuality: 0.20
-  };
-
-  // Level compatibility
-  const levelScore = calculateLevelCompatibility(offerSkill.level, requestSkill.level);
-  score += levelScore * weights.levelCompatibility;
-
-  // Location compatibility
-  const locationScore = calculateLocationCompatibility(offerSkill.location, requestSkill.location);
-  score += locationScore * weights.locationCompatibility;
-
-  // Category match (same category is better)
-  const categoryScore = offerSkill.category === requestSkill.category ? 1.0 : 0.5;
-  score += categoryScore * weights.categoryMatch;
-
-  // User rating balance (similar ratings are better)
-  const offerRating = offerSkill.user.rating || 0;
-  const requestRating = requestSkill.user.rating || 0;
-  const ratingDiff = Math.abs(offerRating - requestRating);
-  const ratingBalanceScore = Math.max(0, 1 - (ratingDiff / 5));
-  score += ratingBalanceScore * weights.userRatingBalance;
-
-  // Skill quality (based on description, tags, etc.)
-  const offerQuality = calculateSkillQuality(offerSkill);
-  const requestQuality = calculateSkillQuality(requestSkill);
-  const qualityScore = (offerQuality + requestQuality) / 2;
-  score += qualityScore * weights.skillQuality;
-
-  return Math.round(score * 100) / 100;
-};
-
-// Helper functions (reused from skillController)
-const calculateLevelCompatibility = (level1, level2) => {
-  const levels = { 'beginner': 1, 'intermediate': 2, 'advanced': 3 };
-  const diff = Math.abs(levels[level1] - levels[level2]);
-  
-  if (diff === 0) return 1.0;
-  if (diff === 1) return 0.8;
-  return 0.3;
-};
-
-const calculateLocationCompatibility = (location1, location2) => {
-  if (location1 === location2) return 1.0;
-  if (location1 === 'both' || location2 === 'both') return 0.8;
-  return 0.2;
-};
-
-const calculateSkillQuality = (skill) => {
-  let score = 0.5;
-
-  if (skill.description && skill.description.length > 50) score += 0.2;
-  if (skill.description && skill.description.length > 100) score += 0.1;
-  if (skill.tags && skill.tags.length > 0) score += 0.1;
-  if (skill.tags && skill.tags.length > 2) score += 0.1;
-  if (skill.duration) score += 0.1;
-
-  return Math.min(score, 1.0);
 };
 
 module.exports = {

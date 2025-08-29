@@ -208,19 +208,76 @@ const findSkillMatches = async (req, res) => {
   try {
     const { id } = req.params;
     
-    const skill = await Skill.findByPk(id);
+    const skill = await Skill.findByPk(id, {
+      include: [
+        {
+          association: 'user',
+          attributes: ['id', 'username', 'firstName', 'lastName', 'rating', 'totalRatings'],
+        }
+      ]
+    });
+    
     if (!skill) {
       return res.status(404).json({ error: 'Skill not found' });
     }
 
-    // Simple test - just return the skill itself with a default score
-    const matches = [{
-      ...skill.toJSON(),
-      matchScore: 0.8,
-      user: skill.user || { id: 'unknown', username: 'Unknown', firstName: 'Unknown', lastName: 'User', rating: 0, totalRatings: 0 }
-    }];
+    const oppositeType = skill.type === 'offer' ? 'request' : 'offer';
 
-    res.json({ matches });
+    // Find potential matches (skills of opposite type in same category)
+    const potentialMatches = await Skill.findAll({
+      where: {
+        type: oppositeType,
+        category: skill.category,
+        isActive: true,
+        userId: { [Op.not]: skill.userId }, // Exclude the current skill's user
+      },
+      include: [
+        {
+          association: 'user',
+          attributes: ['id', 'username', 'firstName', 'lastName', 'rating', 'totalRatings'],
+        }
+      ],
+      order: [['createdAt', 'DESC']],
+      limit: 10,
+    });
+
+    // Get user's own skills for potential exchange (if user is authenticated)
+    let userSkills = [];
+    if (req.user && req.user.id) {
+      userSkills = await Skill.findAll({
+        where: {
+          type: 'offer',
+          isActive: true,
+          userId: req.user.id,
+        },
+        include: [
+          {
+            association: 'user',
+            attributes: ['id', 'username', 'firstName', 'lastName', 'rating', 'totalRatings'],
+          }
+        ],
+        order: [['createdAt', 'DESC']],
+        limit: 5,
+      });
+    }
+
+    // Calculate match scores for potential matches
+    const scoredMatches = potentialMatches.map(match => {
+      const score = calculateMatchScore(skill, match);
+      return { ...match.toJSON(), matchScore: score };
+    });
+
+    // Calculate scores for user's own skills
+    const scoredUserSkills = userSkills.map(userSkill => {
+      const score = calculateMatchScore(skill, userSkill);
+      return { ...userSkill.toJSON(), matchScore: score };
+    });
+
+    // Combine and sort by score
+    const allMatches = [...scoredMatches, ...scoredUserSkills];
+    allMatches.sort((a, b) => b.matchScore - a.matchScore);
+
+    res.json({ matches: allMatches });
   } catch (error) {
     console.error('Find skill matches error:', error);
     res.status(500).json({ error: 'Server error' });
