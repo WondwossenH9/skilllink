@@ -48,3 +48,4 @@ infrastructure/.env.deployment
 frontend/build/
 backend/dist/
 
+AWSCLIV2.msi
