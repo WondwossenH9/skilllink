@@ -64,6 +64,23 @@ aws s3api put-bucket-website --bucket "$S3_BUCKET" --website-configuration '{
   "ErrorDocument": {"Key": "index.html"}
 }'
 
+# Make bucket publicly accessible for website hosting
+aws s3api put-public-access-block --bucket "$S3_BUCKET" --public-access-block-configuration "BlockPublicAcls=false,IgnorePublicAcls=false,BlockPublicPolicy=false,RestrictPublicBuckets=false"
+
+# Add bucket policy for public read access
+aws s3api put-bucket-policy --bucket "$S3_BUCKET" --policy "{
+    \"Version\": \"2012-10-17\",
+    \"Statement\": [
+        {
+            \"Sid\": \"PublicReadGetObject\",
+            \"Effect\": \"Allow\",
+            \"Principal\": \"*\",
+            \"Action\": \"s3:GetObject\",
+            \"Resource\": \"arn:aws:s3:::$S3_BUCKET/*\"
+        }
+    ]
+}"
+
 # Upload frontend
 aws s3 sync frontend/build "s3://$S3_BUCKET" --delete
 
