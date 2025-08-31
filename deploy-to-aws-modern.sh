@@ -1,15 +1,15 @@
 #!/bin/bash
 set -e
 
-# SkillLink AWS Deployment Script - Fixed Version
-# This script addresses all issues identified in the audit
+# SkillLink AWS Deployment Script - Modern Version
+# Uses Amazon Linux 2023 and Node.js 20 LTS
 
 PROJECT_NAME="skilllink"
 AWS_REGION="us-east-1"
 OWNER="Wondwossen"
 ENVIRONMENT="${1:-dev}"
 
-echo "🚀 Starting SkillLink AWS deployment for $ENVIRONMENT environment..."
+echo "🚀 Starting SkillLink AWS deployment for $ENVIRONMENT environment (Modern Stack)..."
 
 # Validate AWS CLI and credentials
 if ! command -v aws &> /dev/null; then
@@ -67,11 +67,13 @@ aws s3api put-bucket-website --bucket "$S3_BUCKET" --website-configuration '{
 # Upload frontend
 aws s3 sync frontend/build "s3://$S3_BUCKET" --delete
 
-# 2. EC2 setup
-echo "💻 Setting up EC2 instance..."
+# 2. EC2 setup with Amazon Linux 2023
+echo "💻 Setting up EC2 instance with Amazon Linux 2023..."
 AMI_ID=$(aws ec2 describe-images --owners amazon \
-  --filters "Name=name,Values=amzn2-ami-hvm-*-x86_64-gp2" "Name=state,Values=available" \
+  --filters "Name=name,Values=al2023-ami-*-x86_64" "Name=state,Values=available" \
   --query "Images | sort_by(@, &CreationDate) | [-1].ImageId" --output text --region $AWS_REGION)
+
+echo "Using AMI: $AMI_ID"
 
 KEY_NAME="${PROJECT_NAME}-keypair-${ENVIRONMENT}"
 if ! aws ec2 describe-key-pairs --key-names $KEY_NAME &> /dev/null; then
@@ -101,7 +103,7 @@ if [[ "$SECURITY_GROUP_ID" == "None" || -z "$SECURITY_GROUP_ID" ]]; then
   aws ec2 authorize-security-group-ingress --group-id $SECURITY_GROUP_ID --protocol tcp --port 443 --cidr 0.0.0.0/0
 fi
 
-# EC2 instance
+# EC2 instance with Amazon Linux 2023
 INSTANCE_ID=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=$EC2_NAME_TAG" "Name=instance-state-name,Values=running" --query 'Reservations[0].Instances[0].InstanceId' --output text --region $AWS_REGION)
 
 if [[ "$INSTANCE_ID" == "None" || -z "$INSTANCE_ID" ]]; then
@@ -171,28 +173,25 @@ RATE_LIMIT_WINDOW_MS=900000
 RATE_LIMIT_MAX_REQUESTS=100
 EOF
 
-# Create deployment script for EC2
+# Create deployment script for EC2 with modern Node.js
 cat > deploy-package/deploy.sh <<'EOF'
 #!/bin/bash
 set -e
 
-echo "🚀 Deploying SkillLink backend..."
+echo "🚀 Deploying SkillLink backend with modern Node.js..."
 
-# Install Node.js if not installed
-if ! command -v node &> /dev/null; then
-    echo "📦 Installing Node.js..."
-    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
-    export NVM_DIR="$HOME/.nvm"
-    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-    nvm install 18
-    nvm use 18
-fi
+# Install Node.js 20 LTS using NodeSource
+echo "📦 Installing Node.js 20 LTS..."
+curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
+sudo yum install -y nodejs
 
-# Install PM2 if not installed
-if ! command -v pm2 &> /dev/null; then
-    echo "📦 Installing PM2..."
-    npm install -g pm2
-fi
+# Verify Node.js installation
+echo "Node.js version: $(node --version)"
+echo "npm version: $(npm --version)"
+
+# Install PM2 globally
+echo "📦 Installing PM2..."
+sudo npm install -g pm2
 
 # Install dependencies
 echo "📦 Installing dependencies..."
@@ -267,3 +266,9 @@ echo "🔒 Security Notes:"
 echo "- SSH access is currently open to 0.0.0.0/0 - restrict this in production"
 echo "- Consider adding CloudFront for frontend and ALB for backend"
 echo "- Move secrets to AWS Secrets Manager for production"
+echo ""
+echo "🚀 Modern Stack Used:"
+echo "- Amazon Linux 2023"
+echo "- Node.js 20 LTS"
+echo "- PostgreSQL 17"
+echo "- PM2 Process Manager"
