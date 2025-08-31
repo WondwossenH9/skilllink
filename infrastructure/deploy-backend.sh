@@ -26,13 +26,14 @@ rm -rf deploy-package/node_modules
 rm -f deploy-package/*.db
 
 # Create production environment file
+export DATABASE_URL="postgres://${DB_USERNAME}:${DB_PASSWORD}@${DB_ENDPOINT}:5432/${DB_NAME}"
 cat > deploy-package/.env <<EOF
 NODE_ENV=production
 PORT=3001
-DATABASE_URL=$DATABASE_URL
+DATABASE_URL=${DATABASE_URL}
 JWT_SECRET=skilllink-production-jwt-secret-$(openssl rand -hex 32)
 JWT_EXPIRE=7d
-FRONTEND_URL=http://$S3_BUCKET.s3-website-$AWS_REGION.amazonaws.com
+FRONTEND_URL=https://${FRONTEND_DOMAIN}
 RATE_LIMIT_WINDOW_MS=900000
 RATE_LIMIT_MAX_REQUESTS=100
 EOF

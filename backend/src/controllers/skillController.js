@@ -1,5 +1,6 @@
 const { Skill, User, Match } = require('../models');
 const { Op } = require('sequelize');
+const sequelize = require('../../config/database');
 
 const createSkill = async (req, res) => {
   try {
@@ -39,13 +40,13 @@ const createSkill = async (req, res) => {
 const getSkills = async (req, res) => {
   try {
     const { 
+      page = 1, 
+      limit = 10, 
+      search, 
       type, 
       category, 
       level, 
-      location, 
-      search, 
-      page = 1, 
-      limit = 10 
+      location 
     } = req.query;
 
     const offset = (page - 1) * limit;
@@ -58,12 +59,13 @@ const getSkills = async (req, res) => {
     if (level) whereClause.level = level;
     if (location) whereClause.location = location;
     
-    // Add search
+    // Add search with dialect-aware operator
     if (search) {
+      const likeOp = sequelize.getDialect() === 'postgres' ? Op.iLike : Op.like;
       whereClause[Op.or] = [
-        { title: { [Op.iLike]: `%${search}%` } },
-        { description: { [Op.iLike]: `%${search}%` } },
-        { category: { [Op.iLike]: `%${search}%` } },
+        { title: { [likeOp]: `%${search}%` } },
+        { description: { [likeOp]: `%${search}%` } },
+        { category: { [likeOp]: `%${search}%` } },
       ];
     }
 
