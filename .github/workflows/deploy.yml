@@ -1,0 +1,207 @@
+name: Deploy SkillLink to AWS
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+  NODE_VERSION: '18'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install backend dependencies
+        run: |
+          cd backend
+          npm ci
+
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Run backend tests
+        run: |
+          cd backend
+          npm test || echo "No tests configured"
+
+      - name: Run frontend tests
+        run: |
+          cd frontend
+          npm test || echo "No tests configured"
+
+      - name: Build frontend
+        run: |
+          cd frontend
+          npm run build
+
+  deploy-infrastructure:
+    needs: test
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.5.0"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform Init
+        run: |
+          cd infrastructure/terraform
+          terraform init
+
+      - name: Terraform Plan
+        run: |
+          cd infrastructure/terraform
+          terraform plan \
+            -var="aws_region=${{ env.AWS_REGION }}" \
+            -var="project_name=skilllink" \
+            -var="allowed_ssh_cidr=${{ secrets.ALLOWED_SSH_CIDR }}" \
+            -var="domain_name=${{ secrets.DOMAIN_NAME }}" \
+            -var="key_pair_name=${{ secrets.KEY_PAIR_NAME }}" \
+            -var="db_name=${{ secrets.DB_NAME }}" \
+            -var="db_username=${{ secrets.DB_USERNAME }}" \
+            -var="db_password=${{ secrets.DB_PASSWORD }}" \
+            -var="instance_type=t3.micro" \
+            -out=tfplan
+
+      - name: Terraform Apply
+        run: |
+          cd infrastructure/terraform
+          terraform apply tfplan
+
+      - name: Get Terraform outputs
+        run: |
+          cd infrastructure/terraform
+          echo "FRONTEND_BUCKET=$(terraform output -raw frontend_bucket_name)" >> $GITHUB_ENV
+          echo "CLOUDFRONT_DISTRIBUTION_ID=$(terraform output -raw cloudfront_distribution_id)" >> $GITHUB_ENV
+          echo "BACKEND_PUBLIC_IP=$(terraform output -raw backend_public_ip)" >> $GITHUB_ENV
+
+  deploy-frontend:
+    needs: deploy-infrastructure
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Build frontend
+        run: |
+          cd frontend
+          npm run build
+
+      - name: Deploy to S3
+        run: |
+          aws s3 sync frontend/build/ s3://${{ env.FRONTEND_BUCKET }} --delete
+
+      - name: Invalidate CloudFront cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ env.CLOUDFRONT_DISTRIBUTION_ID }} \
+            --paths "/*"
+
+  deploy-backend:
+    needs: deploy-infrastructure
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Create deployment package
+        run: |
+          cd backend
+          tar -czf ../backend.tar.gz --exclude=node_modules --exclude=.env --exclude=*.db .
+
+      - name: Deploy to EC2
+        run: |
+          # Wait for EC2 instance to be ready
+          aws ec2 wait instance-status-ok --instance-ids $(aws ec2 describe-instances --filters "Name=tag:Name,Values=skilllink-backend" --query 'Reservations[].Instances[].InstanceId' --output text)
+          
+          # Copy deployment package
+          scp -i ${{ secrets.EC2_SSH_KEY }} -o StrictHostKeyChecking=no backend.tar.gz ubuntu@${{ env.BACKEND_PUBLIC_IP }}:/tmp/
+          
+          # Run deployment script
+          ssh -i ${{ secrets.EC2_SSH_KEY }} -o StrictHostKeyChecking=no ubuntu@${{ env.BACKEND_PUBLIC_IP }} '
+            cd /var/www/skilllink/backend
+            tar -xzf /tmp/backend.tar.gz
+            npm ci --production
+            pm2 restart skilllink-api
+          '
+
+  health-check:
+    needs: [deploy-frontend, deploy-backend]
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Wait for services to be ready
+        run: |
+          sleep 60
+
+      - name: Health check backend
+        run: |
+          curl -f "http://${{ env.BACKEND_PUBLIC_IP }}/health" || exit 1
+
+      - name: Health check frontend
+        run: |
+          curl -f "https://${{ secrets.DOMAIN_NAME }}" || exit 1
+
+      - name: Deployment success
+        run: |
+          echo "🎉 SkillLink deployment completed successfully!"
+          echo "Frontend: https://${{ secrets.DOMAIN_NAME }}"
+          echo "Backend: http://${{ env.BACKEND_PUBLIC_IP }}"

@@ -41,18 +41,18 @@ cat > server-setup.sh << 'SETUP_EOF'
 #!/bin/bash
 
 # Update system
-sudo yum update -y
+sudo apt-get update -y
 
 # Install Node.js 18
-curl -sL https://rpm.nodesource.com/setup_18.x | sudo bash -
-sudo yum install -y nodejs
+curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+sudo apt-get install -y nodejs
 
 # Install PM2 for process management
 sudo npm install -g pm2
 
 # Create application directory
 sudo mkdir -p /var/www/skilllink
-sudo chown ec2-user:ec2-user /var/www/skilllink
+sudo chown ubuntu:ubuntu /var/www/skilllink
 
 # Extract and setup application
 cd /var/www/skilllink
@@ -61,22 +61,23 @@ tar -xzf /tmp/backend.tar.gz
 # Install dependencies
 npm install --production
 
-# Create environment file
+# Create environment file with DATABASE_URL
 cat > .env << ENV_EOF
 NODE_ENV=production
 PORT=3001
 JWT_SECRET=$(openssl rand -base64 32)
 JWT_EXPIRE=7d
 
-# Database Configuration (update with your RDS details)
-DB_DIALECT=postgres
-DB_HOST=${DB_ENDPOINT}
-DB_PORT=5432
-DB_NAME=${DB_NAME}
-DB_USER=${DB_USERNAME}
-DB_PASS=${DB_PASSWORD}
+# Database Configuration - Use DATABASE_URL for production
+DATABASE_URL=postgresql://${DB_USERNAME}:${DB_PASSWORD}@${DB_ENDPOINT}:5432/${DB_NAME}
+DB_SSL=true
 
-FRONTEND_URL=http://${BUCKET_NAME}.s3-website-us-east-1.amazonaws.com
+# CORS Configuration
+FRONTEND_URL=https://${FRONTEND_DOMAIN}
+
+# Rate Limiting
+RATE_LIMIT_WINDOW_MS=900000
+RATE_LIMIT_MAX_REQUESTS=100
 ENV_EOF
 
 # Start application with PM2
@@ -105,17 +106,17 @@ sed -i "s/\${DB_ENDPOINT}/$DB_ENDPOINT/g" server-setup.sh
 sed -i "s/\${DB_NAME}/$DB_NAME/g" server-setup.sh
 sed -i "s/\${DB_USERNAME}/$DB_USERNAME/g" server-setup.sh
 sed -i "s/\${DB_PASSWORD}/$DB_PASSWORD/g" server-setup.sh
-sed -i "s/\${BUCKET_NAME}/$BUCKET_NAME/g" server-setup.sh
+sed -i "s/\${FRONTEND_DOMAIN}/$FRONTEND_DOMAIN/g" server-setup.sh
 
 # Deploy to EC2
 echo "🚀 Deploying to EC2..."
 
 # Copy files to server
-scp -i $KEY_NAME.pem -o StrictHostKeyChecking=no backend.tar.gz ec2-user@$PUBLIC_IP:/tmp/
-scp -i $KEY_NAME.pem -o StrictHostKeyChecking=no server-setup.sh ec2-user@$PUBLIC_IP:/tmp/
+scp -i $KEY_NAME.pem -o StrictHostKeyChecking=no backend.tar.gz ubuntu@$PUBLIC_IP:/tmp/
+scp -i $KEY_NAME.pem -o StrictHostKeyChecking=no server-setup.sh ubuntu@$PUBLIC_IP:/tmp/
 
 # Run setup script on server
-ssh -i $KEY_NAME.pem -o StrictHostKeyChecking=no ec2-user@$PUBLIC_IP 'chmod +x /tmp/server-setup.sh && /tmp/server-setup.sh'
+ssh -i $KEY_NAME.pem -o StrictHostKeyChecking=no ubuntu@$PUBLIC_IP 'chmod +x /tmp/server-setup.sh && /tmp/server-setup.sh'
 
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}✅ Backend deployed successfully${NC}"
@@ -127,7 +128,7 @@ if [ $? -eq 0 ]; then
     echo "http://$PUBLIC_IP:3001/api/health"
     echo ""
     echo "🔗 To connect to your server:"
-    echo "ssh -i $KEY_NAME.pem ec2-user@$PUBLIC_IP"
+    echo "ssh -i $KEY_NAME.pem ubuntu@$PUBLIC_IP"
     echo ""
 else
     echo -e "${RED}❌ Backend deployment failed${NC}"
