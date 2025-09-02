@@ -25,7 +25,7 @@ echo -e "${YELLOW}🔍 Checking prerequisites...${NC}"
 # Check if AWS CLI is installed
 if ! command -v aws &> /dev/null; then
     echo -e "${RED}❌ AWS CLI is not installed. Please install it first.${NC}"
-    exit 1
+  exit 1
 fi
 
 # Check if Terraform is installed
@@ -52,8 +52,8 @@ echo -e "${GREEN}✅ All prerequisites are met${NC}"
 echo -e "${YELLOW}🔐 Checking AWS credentials...${NC}"
 if ! aws sts get-caller-identity &> /dev/null; then
     echo -e "${RED}❌ AWS credentials not configured. Please run 'aws configure' first.${NC}"
-    exit 1
-fi
+      exit 1
+    fi
 
 AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 AWS_REGION=$(aws configure get region)
