@@ -94,11 +94,13 @@ if [[ "$SECURITY_GROUP_ID" == "None" || -z "$SECURITY_GROUP_ID" ]]; then
   # SSH access (restrict to your IP in production)
   aws ec2 authorize-security-group-ingress --group-id $SECURITY_GROUP_ID --protocol tcp --port 22 --cidr 0.0.0.0/0
   
-  # HTTP access for ALB/Nginx (not direct app port)
+  # HTTP access for Nginx reverse proxy
   aws ec2 authorize-security-group-ingress --group-id $SECURITY_GROUP_ID --protocol tcp --port 80 --cidr 0.0.0.0/0
   
   # HTTPS access
   aws ec2 authorize-security-group-ingress --group-id $SECURITY_GROUP_ID --protocol tcp --port 443 --cidr 0.0.0.0/0
+  
+  # Note: Port 3001 is NOT opened to public - only accessible via Nginx reverse proxy
 fi
 
 # EC2 instance
@@ -194,6 +196,16 @@ if ! command -v pm2 &> /dev/null; then
     npm install -g pm2
 fi
 
+# Install and configure Nginx
+echo "📦 Installing and configuring Nginx..."
+sudo yum update -y
+sudo yum install -y nginx
+
+# Copy Nginx configuration
+sudo cp nginx.conf /etc/nginx/conf.d/skilllink.conf
+sudo systemctl enable nginx
+sudo systemctl start nginx
+
 # Install dependencies
 echo "📦 Installing dependencies..."
 npm ci --production
@@ -240,6 +252,7 @@ chmod +x deploy-package/deploy.sh
 # Copy files to EC2
 echo "📤 Copying files to EC2..."
 scp -i "$KEY_NAME.pem" -r deploy-package/* ec2-user@$EC2_PUBLIC_IP:~/
+scp -i "$KEY_NAME.pem" nginx.conf ec2-user@$EC2_PUBLIC_IP:~/
 
 # Deploy on EC2
 echo "🔧 Deploying on EC2..."
@@ -254,7 +267,8 @@ echo "✅ Deployment completed successfully!"
 echo ""
 echo "📋 Deployment Summary:"
 echo "Frontend URL: http://$S3_BUCKET.s3-website-$AWS_REGION.amazonaws.com"
-echo "Backend URL: http://$EC2_PUBLIC_IP:3001"
+echo "Backend URL: http://$EC2_PUBLIC_IP/api"
+echo "Health Check: http://$EC2_PUBLIC_IP/health"
 echo "Database: $DB_ENDPOINT"
 echo ""
 echo "🔧 Management commands:"

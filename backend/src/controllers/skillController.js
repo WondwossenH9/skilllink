@@ -1,18 +1,15 @@
-const { Skill, User, Match } = require('../models');
+const { Skill, User, Match, sequelize } = require('../models');
 const { Op } = require('sequelize');
-const sequelize = require('../../config/database');
 
 const createSkill = async (req, res) => {
   try {
-    const { title, description, category, type, level, duration, location, tags } = req.body;
+    const { title, description, category, level, location, tags } = req.body;
 
     const skill = await Skill.create({
       title,
       description,
       category,
-      type,
       level: level || 'beginner',
-      duration,
       location: location || 'online',
       tags: tags || [],
       userId: req.user.id,

@@ -1,20 +1,33 @@
 #!/bin/bash
 set -e
 
-echo "🚀 Deploying SkillLink backend with modern Node.js..."
+echo "🚀 Deploying SkillLink backend..."
 
-# Install Node.js 20 LTS using NodeSource
-echo "📦 Installing Node.js 20 LTS..."
-curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
-sudo yum install -y nodejs
+# Install Node.js if not installed
+if ! command -v node &> /dev/null; then
+    echo "📦 Installing Node.js..."
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+    export NVM_DIR="$HOME/.nvm"
+    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+    nvm install 18
+    nvm use 18
+fi
 
-# Verify Node.js installation
-echo "Node.js version: $(node --version)"
-echo "npm version: $(npm --version)"
+# Install PM2 if not installed
+if ! command -v pm2 &> /dev/null; then
+    echo "📦 Installing PM2..."
+    npm install -g pm2
+fi
 
-# Install PM2 globally
-echo "📦 Installing PM2..."
-sudo npm install -g pm2
+# Install and configure Nginx
+echo "📦 Installing and configuring Nginx..."
+sudo yum update -y
+sudo yum install -y nginx
+
+# Copy Nginx configuration
+sudo cp nginx.conf /etc/nginx/conf.d/skilllink.conf
+sudo systemctl enable nginx
+sudo systemctl start nginx
 
 # Install dependencies
 echo "📦 Installing dependencies..."

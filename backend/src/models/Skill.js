@@ -1,7 +1,6 @@
 const { DataTypes } = require('sequelize');
-const sequelize = require('../../config/database');
 
-const Skill = sequelize.define('Skill', {
+const Skill = (sequelize) => sequelize.define('Skill', {
   id: {
     type: DataTypes.UUID,
     defaultValue: DataTypes.UUIDV4,
@@ -11,7 +10,7 @@ const Skill = sequelize.define('Skill', {
     type: DataTypes.STRING,
     allowNull: false,
     validate: {
-      len: [5, 100],
+      len: [3, 100],
     },
   },
   description: {
@@ -22,23 +21,23 @@ const Skill = sequelize.define('Skill', {
     type: DataTypes.STRING,
     allowNull: false,
   },
-  type: {
-    type: DataTypes.ENUM('offer', 'request'),
+  level: {
+    type: DataTypes.ENUM('beginner', 'intermediate', 'advanced', 'expert'),
     allowNull: false,
   },
-  level: {
-    type: DataTypes.ENUM('beginner', 'intermediate', 'advanced'),
-    defaultValue: 'beginner',
-  },
-  duration: {
-    type: DataTypes.STRING, // e.g., "2 hours", "1 week"
-    allowNull: true,
-  },
   location: {
-    type: DataTypes.ENUM('online', 'in-person', 'both'),
-    defaultValue: 'online',
+    type: DataTypes.STRING,
+    allowNull: false,
   },
-  isActive: {
+  userId: {
+    type: DataTypes.UUID,
+    allowNull: false,
+    references: {
+      model: 'Users',
+      key: 'id',
+    },
+  },
+  isAvailable: {
     type: DataTypes.BOOLEAN,
     defaultValue: true,
   },
@@ -46,6 +45,21 @@ const Skill = sequelize.define('Skill', {
     type: DataTypes.JSON,
     defaultValue: [],
   },
+}, {
+  indexes: [
+    {
+      fields: ['category'],
+    },
+    {
+      fields: ['level'],
+    },
+    {
+      fields: ['location'],
+    },
+    {
+      fields: ['userId'],
+    },
+  ],
 });
 
 module.exports = Skill;

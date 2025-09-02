@@ -1,8 +1,8 @@
 import axios, { AxiosResponse } from 'axios';
 import toast from 'react-hot-toast';
 
-// Use environment variable or default to deployed backend
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://54.147.161.187:3001/api';
+// Use environment variable or default to localhost for development
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
 
 // Create axios instance
 const api = axios.create({

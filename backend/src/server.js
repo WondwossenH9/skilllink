@@ -5,11 +5,8 @@ const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
-const sequelize = require('../config/database');
+const { sequelize } = require('./models');
 const routes = require('./routes');
-
-// Import models to establish associations
-require('./models');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
