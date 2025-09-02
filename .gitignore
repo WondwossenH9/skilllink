@@ -49,3 +49,7 @@ frontend/build/
 backend/dist/
 
 AWSCLIV2.msi
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
