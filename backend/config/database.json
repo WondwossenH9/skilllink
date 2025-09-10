@@ -1,0 +1,30 @@
+{
+  "development": {
+    "dialect": "sqlite",
+    "storage": "./dev.sqlite3",
+    "logging": true,
+    "seederStorage": "sequelize",
+    "migrationStorage": "sequelize"
+  },
+  "test": {
+    "dialect": "sqlite",
+    "storage": ":memory:",
+    "logging": false,
+    "seederStorage": "sequelize",
+    "migrationStorage": "sequelize"
+  },
+  "production": {
+    "use_env_variable": "DATABASE_URL",
+    "dialect": "postgres",
+    "logging": false,
+    "ssl": true,
+    "dialectOptions": {
+      "ssl": {
+        "require": true,
+        "rejectUnauthorized": false
+      }
+    },
+    "seederStorage": "sequelize",
+    "migrationStorage": "sequelize"
+  }
+}

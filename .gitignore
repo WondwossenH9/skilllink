@@ -8,12 +8,21 @@ yarn-error.log*
 /frontend/build
 /backend/dist
 
-# Environment variables
+# Environment variables - Comprehensive protection
 .env
+.env.*
+!.env.example
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+.env.deployment
+*/.env
+*/env.*
+!*/env.example
+deploy-temp/.env
+deploy-temp/env.*
+!deploy-temp/env.example
 
 # Database
 *.db
@@ -21,7 +30,7 @@ yarn-error.log*
 *.sqlite3
 
 # Logs
-logs
+logs/
 *.log
 
 # IDE
@@ -53,3 +62,12 @@ AWSCLIV2.msi
 *.tfstate
 *.tfstate.*
 .terraform.lock.hcl
+
+# Security - Additional sensitive files
+*.key
+*.pem
+*.p12
+*.pfx
+secrets/
+config/secrets/
+docker-compose.override.yml
