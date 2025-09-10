@@ -48,7 +48,7 @@ const getSkills = async (req, res) => {
 
     const offset = (page - 1) * limit;
     
-    let whereClause = { isAvailable: true };
+    let whereClause = { isActive: true };
     
     // Add filters
     if (type) whereClause.type = type;
@@ -99,7 +99,7 @@ const getSkillById = async (req, res) => {
     const { id } = req.params;
 
     const skill = await Skill.findOne({
-      where: { id, isAvailable: true },
+      where: { id, isActive: true },
       include: [
         {
           association: 'user',
@@ -125,7 +125,7 @@ const updateSkill = async (req, res) => {
     const { title, description, category, level, duration, location, tags } = req.body;
 
     const skill = await Skill.findOne({
-      where: { id, userId: req.user.id, isAvailable: true }
+      where: { id, userId: req.user.id, isActive: true }
     });
 
     if (!skill) {
@@ -166,14 +166,14 @@ const deleteSkill = async (req, res) => {
     const { id } = req.params;
 
     const skill = await Skill.findOne({
-      where: { id, userId: req.user.id, isAvailable: true }
+      where: { id, userId: req.user.id, isActive: true }
     });
 
     if (!skill) {
       return res.status(404).json({ error: 'Skill not found' });
     }
 
-    await skill.update({ isAvailable: false });
+    await skill.update({ isActive: false });
 
     res.json({ message: 'Skill deleted successfully' });
   } catch (error) {
@@ -185,7 +185,7 @@ const deleteSkill = async (req, res) => {
 const getUserSkills = async (req, res) => {
   try {
     const skills = await Skill.findAll({
-      where: { userId: req.user.id, isAvailable: true },
+      where: { userId: req.user.id, isActive: true },
       include: [
         {
           association: 'user',
@@ -227,7 +227,7 @@ const findSkillMatches = async (req, res) => {
       where: {
         type: oppositeType,
         category: skill.category,
-        isAvailable: true,
+        isActive: true,
         userId: { [Op.not]: skill.userId }, // Exclude the current skill's user
       },
       include: [
@@ -246,7 +246,7 @@ const findSkillMatches = async (req, res) => {
       userSkills = await Skill.findAll({
         where: {
           type: 'offer',
-          isAvailable: true,
+          isActive: true,
           userId: req.user.id,
         },
         include: [

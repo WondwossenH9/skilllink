@@ -2,7 +2,10 @@ import axios, { AxiosResponse } from 'axios';
 import toast from 'react-hot-toast';
 
 // Use environment variable or default to localhost for development
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 
+  (process.env.NODE_ENV === 'production' 
+    ? 'http://34.228.73.44/api'  // Use EC2 public IP for production
+    : 'http://localhost:3001/api');
 
 // Create axios instance
 const api = axios.create({

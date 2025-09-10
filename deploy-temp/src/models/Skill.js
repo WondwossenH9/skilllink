@@ -21,17 +21,9 @@ const Skill = (sequelize) => sequelize.define('Skill', {
     type: DataTypes.STRING,
     allowNull: false,
   },
-  type: {
-    type: DataTypes.ENUM('offer', 'request'),
-    allowNull: false,
-  },
   level: {
     type: DataTypes.ENUM('beginner', 'intermediate', 'advanced', 'expert'),
     allowNull: false,
-  },
-  duration: {
-    type: DataTypes.STRING,
-    allowNull: true,
   },
   location: {
     type: DataTypes.STRING,
