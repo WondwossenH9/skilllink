@@ -2,15 +2,37 @@ name: Deploy SkillLink to AWS
 
 on:
   push:
+    branches: [ main, develop ]
+  pull_request:
     branches: [ main ]
-  workflow_dispatch:
 
 env:
   AWS_REGION: us-east-1
-  NODE_VERSION: '18'
+  PROJECT_NAME: skilllink
 
 jobs:
-  test:
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  test-backend:
+    name: Test Backend
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -19,131 +41,146 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version: '18'
           cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
 
-      - name: Install backend dependencies
-        run: |
-          cd backend
-          npm ci
+      - name: Install dependencies
+        working-directory: ./backend
+        run: npm ci
 
-      - name: Install frontend dependencies
-        run: |
-          cd frontend
-          npm ci
+      - name: Run linting
+        working-directory: ./backend
+        run: npm run lint
 
-      - name: Run backend tests
-        run: |
-          cd backend
-          npm test || echo "No tests configured"
+      - name: Run tests
+        working-directory: ./backend
+        run: npm test
+        env:
+          NODE_ENV: test
 
-      - name: Run frontend tests
-        run: |
-          cd frontend
-          npm test || echo "No tests configured"
+      - name: Run security audit
+        working-directory: ./backend
+        run: npm audit --audit-level=moderate
 
-      - name: Build frontend
-        run: |
-          cd frontend
-          npm run build
-
-  deploy-infrastructure:
-    needs: test
+  test-frontend:
+    name: Test Frontend
     runs-on: ubuntu-latest
-    environment: production
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Run linting
+        working-directory: ./frontend
+        run: npm run lint
+
+      - name: Run type checking
+        working-directory: ./frontend
+        run: npm run type-check
+
+      - name: Build application
+        working-directory: ./frontend
+        run: npm run build
+        env:
+          REACT_APP_API_URL: ${{ secrets.REACT_APP_API_URL }}
+
+      - name: Run security audit
+        working-directory: ./frontend
+        run: npm audit --audit-level=moderate
+
+  build-and-push:
+    name: Build and Push Docker Images
+    runs-on: ubuntu-latest
+    needs: [security-scan, test-backend, test-frontend]
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push backend image
+        working-directory: ./backend
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY-backend:$GITHUB_SHA .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY-backend:$GITHUB_SHA
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ env.PROJECT_NAME }}
+
+      - name: Build and push frontend image
+        working-directory: ./frontend
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY-frontend:$GITHUB_SHA .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY-frontend:$GITHUB_SHA
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ env.PROJECT_NAME }}
+
+  deploy-infrastructure:
+    name: Deploy Infrastructure
+    runs-on: ubuntu-latest
+    needs: [build-and-push]
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: "1.5.0"
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
+          terraform_version: '1.6.0'
 
       - name: Terraform Init
-        run: |
-          cd infrastructure/terraform
-          terraform init
+        working-directory: ./infrastructure/terraform
+        run: terraform init
 
       - name: Terraform Plan
-        run: |
-          cd infrastructure/terraform
-          terraform plan \
-            -var="aws_region=${{ env.AWS_REGION }}" \
-            -var="project_name=skilllink" \
-            -var="allowed_ssh_cidr=${{ secrets.ALLOWED_SSH_CIDR }}" \
-            -var="domain_name=${{ secrets.DOMAIN_NAME }}" \
-            -var="key_pair_name=${{ secrets.KEY_PAIR_NAME }}" \
-            -var="db_name=${{ secrets.DB_NAME }}" \
-            -var="db_username=${{ secrets.DB_USERNAME }}" \
-            -var="db_password=${{ secrets.DB_PASSWORD }}" \
-            -var="instance_type=t3.micro" \
-            -out=tfplan
+        working-directory: ./infrastructure/terraform
+        run: terraform plan -out=tfplan
+        env:
+          TF_VAR_environment: prod
+          TF_VAR_project_name: ${{ env.PROJECT_NAME }}
 
       - name: Terraform Apply
-        run: |
-          cd infrastructure/terraform
-          terraform apply tfplan
+        working-directory: ./infrastructure/terraform
+        run: terraform apply -auto-approve tfplan
+        env:
+          TF_VAR_environment: prod
+          TF_VAR_project_name: ${{ env.PROJECT_NAME }}
 
-      - name: Get Terraform outputs
-        run: |
-          cd infrastructure/terraform
-          echo "FRONTEND_BUCKET=$(terraform output -raw frontend_bucket_name)" >> $GITHUB_ENV
-          echo "CLOUDFRONT_DISTRIBUTION_ID=$(terraform output -raw cloudfront_distribution_id)" >> $GITHUB_ENV
-          echo "BACKEND_PUBLIC_IP=$(terraform output -raw backend_public_ip)" >> $GITHUB_ENV
-
-  deploy-frontend:
-    needs: deploy-infrastructure
+  deploy-application:
+    name: Deploy Application
     runs-on: ubuntu-latest
-    environment: production
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Install frontend dependencies
-        run: |
-          cd frontend
-          npm ci
-
-      - name: Build frontend
-        run: |
-          cd frontend
-          npm run build
-
-      - name: Deploy to S3
-        run: |
-          aws s3 sync frontend/build/ s3://${{ env.FRONTEND_BUCKET }} --delete
-
-      - name: Invalidate CloudFront cache
-        run: |
-          aws cloudfront create-invalidation \
-            --distribution-id ${{ env.CLOUDFRONT_DISTRIBUTION_ID }} \
-            --paths "/*"
-
-  deploy-backend:
-    needs: deploy-infrastructure
-    runs-on: ubuntu-latest
-    environment: production
+    needs: [deploy-infrastructure]
+    if: github.ref == 'refs/heads/main'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -155,32 +192,34 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Create deployment package
+      - name: Deploy to ECS
         run: |
-          cd backend
-          tar -czf ../backend.tar.gz --exclude=node_modules --exclude=.env --exclude=*.db .
+          # Get ECS cluster and service info
+          CLUSTER_NAME=$(aws ecs list-clusters --query 'clusterArns[0]' --output text | cut -d'/' -f2)
+          SERVICE_NAME=$(aws ecs list-services --cluster $CLUSTER_NAME --query 'serviceArns[0]' --output text | cut -d'/' -f3)
+          
+          # Update service with new image
+          aws ecs update-service \
+            --cluster $CLUSTER_NAME \
+            --service $SERVICE_NAME \
+            --force-new-deployment
 
-      - name: Deploy to EC2
+      - name: Wait for deployment
         run: |
-          # Wait for EC2 instance to be ready
-          aws ec2 wait instance-status-ok --instance-ids $(aws ec2 describe-instances --filters "Name=tag:Name,Values=skilllink-backend" --query 'Reservations[].Instances[].InstanceId' --output text)
-          
-          # Copy deployment package
-          scp -i ${{ secrets.EC2_SSH_KEY }} -o StrictHostKeyChecking=no backend.tar.gz ubuntu@${{ env.BACKEND_PUBLIC_IP }}:/tmp/
-          
-          # Run deployment script
-          ssh -i ${{ secrets.EC2_SSH_KEY }} -o StrictHostKeyChecking=no ubuntu@${{ env.BACKEND_PUBLIC_IP }} '
-            cd /var/www/skilllink/backend
-            tar -xzf /tmp/backend.tar.gz
-            npm ci --production
-            pm2 restart skilllink-api
-          '
+          # Wait for service to stabilize
+          aws ecs wait services-stable \
+            --cluster $CLUSTER_NAME \
+            --services $SERVICE_NAME
 
-  health-check:
-    needs: [deploy-frontend, deploy-backend]
+  post-deployment-tests:
+    name: Post-Deployment Tests
     runs-on: ubuntu-latest
-    environment: production
+    needs: [deploy-application]
+    if: github.ref == 'refs/heads/main'
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -188,20 +227,44 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Wait for services to be ready
+      - name: Get Load Balancer URL
+        id: get-lb-url
         run: |
-          sleep 60
+          LB_DNS=$(aws elbv2 describe-load-balancers --query 'LoadBalancers[0].DNSName' --output text)
+          echo "lb_url=$LB_DNS" >> $GITHUB_OUTPUT
 
-      - name: Health check backend
+      - name: Run Health Check
         run: |
-          curl -f "http://${{ env.BACKEND_PUBLIC_IP }}/health" || exit 1
+          LB_URL=${{ steps.get-lb-url.outputs.lb_url }}
+          curl -f "http://$LB_URL/api/health" || exit 1
 
-      - name: Health check frontend
+      - name: Run API Tests
         run: |
-          curl -f "https://${{ secrets.DOMAIN_NAME }}" || exit 1
+          LB_URL=${{ steps.get-lb-url.outputs.lb_url }}
+          
+          # Test skills endpoint
+          curl -f "http://$LB_URL/api/skills" || exit 1
+          
+          # Test registration endpoint
+          curl -X POST "http://$LB_URL/api/auth/register" \
+            -H "Content-Type: application/json" \
+            -d '{"name":"Test User","email":"test@example.com","password":"password123"}' \
+            || exit 1
 
-      - name: Deployment success
+  notify:
+    name: Notify Deployment Status
+    runs-on: ubuntu-latest
+    needs: [post-deployment-tests]
+    if: always()
+    steps:
+      - name: Notify Success
+        if: needs.post-deployment-tests.result == 'success'
         run: |
-          echo "🎉 SkillLink deployment completed successfully!"
-          echo "Frontend: https://${{ secrets.DOMAIN_NAME }}"
-          echo "Backend: http://${{ env.BACKEND_PUBLIC_IP }}"
+          echo "✅ Deployment successful!"
+          # Add notification logic here (Slack, email, etc.)
+
+      - name: Notify Failure
+        if: needs.post-deployment-tests.result == 'failure'
+        run: |
+          echo "❌ Deployment failed!"
+          # Add notification logic here (Slack, email, etc.)
